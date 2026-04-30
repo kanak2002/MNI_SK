@@ -1,0 +1,91 @@
+{
+    "Marriott": {
+      "category": "hotel",
+      "risk_level": "low",
+      "trusted_by": ["conservative", "balanced", "convenience_first"],
+      "ad_partnerships": false,
+      "common_data_required": ["full_name", "email", "payment_token"],
+      "reason": "Direct hotel booking, no excessive data sharing"
+    },
+  
+    "Hilton": {
+      "category": "hotel",
+      "risk_level": "low",
+      "trusted_by": ["conservative", "balanced", "convenience_first"],
+      "ad_partnerships": false,
+      "common_data_required": ["full_name", "email", "payment_token"],
+      "reason": "Direct hotel booking, trusted brand"
+    },
+  
+    "Hotels.com": {
+      "category": "hotel",
+      "risk_level": "high",
+      "trusted_by": ["balanced", "convenience_first"],
+      "ad_partnerships": true,
+      "common_data_required": ["full_name", "email", "payment_token", "behavioral_profile"],
+      "reason": "Shares user data with advertising partners"
+    },
+  
+    "Delta": {
+      "category": "flight",
+      "risk_level": "low",
+      "trusted_by": ["conservative", "balanced", "convenience_first"],
+      "ad_partnerships": false,
+      "common_data_required": ["full_name", "email", "passport_number", "payment_token"],
+      "reason": "Direct airline booking, necessary data only"
+    },
+  
+    "Google Flights": {
+      "category": "flight_search",
+      "risk_level": "medium",
+      "trusted_by": ["conservative", "balanced", "convenience_first"],
+      "ad_partnerships": false,
+      "common_data_required": ["destination", "date", "budget"],
+      "reason": "Search platform, minimal personal data needed"
+    },
+  
+    "Kayak": {
+      "category": "flight_search",
+      "risk_level": "high",
+      "trusted_by": ["balanced", "convenience_first"],
+      "ad_partnerships": true,
+      "common_data_required": ["destination", "date", "travel_history", "behavioral_profile"],
+      "reason": "Uses tracking and shares behavioral data"
+    },
+  
+    "Amazon": {
+      "category": "shopping",
+      "risk_level": "medium",
+      "trusted_by": ["balanced", "convenience_first"],
+      "ad_partnerships": true,
+      "common_data_required": ["full_name", "address", "payment_token"],
+      "reason": "Trusted platform but uses behavioral tracking"
+    },
+  
+    "Google Calendar": {
+      "category": "calendar",
+      "risk_level": "low",
+      "trusted_by": ["conservative", "balanced", "convenience_first"],
+      "ad_partnerships": false,
+      "common_data_required": ["event_details"],
+      "reason": "Used only for scheduling, minimal risk"
+    },
+  
+    "Stripe": {
+      "category": "payment",
+      "risk_level": "low",
+      "trusted_by": ["conservative", "balanced", "convenience_first"],
+      "ad_partnerships": false,
+      "common_data_required": ["payment_token"],
+      "reason": "Secure payment processor"
+    },
+  
+    "Chase": {
+      "category": "payment",
+      "risk_level": "low",
+      "trusted_by": ["conservative", "balanced", "convenience_first"],
+      "ad_partnerships": false,
+      "common_data_required": ["payment_token"],
+      "reason": "Bank-grade secure transactions"
+    }
+  }

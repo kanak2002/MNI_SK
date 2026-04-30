@@ -1,0 +1,71 @@
+{
+    "hotel_booking": {
+      "task": "Book me a hotel in Chicago this Saturday under $200",
+      "subtasks": [
+        {
+          "action": "search hotel options",
+          "data_required": ["precise_location", "date", "budget"],
+          "third_party": "Hotels.com"
+        },
+        {
+          "action": "book hotel room",
+          "data_required": ["full_name", "email", "payment"],
+          "third_party": "Marriott"
+        }
+      ]
+    },
+  
+    "flight_booking": {
+      "task": "Book me a flight to NYC next Friday under $300",
+      "subtasks": [
+        {
+          "action": "search flights",
+          "data_required": ["destination", "date", "budget"],
+          "third_party": "Google Flights"
+        },
+        {
+          "action": "book flight",
+          "data_required": ["full_name", "email", "passport_number", "payment"],
+          "third_party": "Delta"
+        }
+      ]
+    },
+  
+    "shopping": {
+      "task": "Order headphones from Amazon under $100",
+      "subtasks": [
+        {
+          "action": "search product",
+          "data_required": ["product_name", "budget"],
+          "third_party": "Amazon"
+        },
+        {
+          "action": "place order",
+          "data_required": ["full_name", "address", "payment"],
+          "third_party": "Amazon"
+        }
+      ]
+    },
+  
+    "calendar": {
+      "task": "Schedule a doctor appointment and add it to my calendar",
+      "subtasks": [
+        {
+          "action": "create calendar event",
+          "data_required": ["event_details", "date"],
+          "third_party": "Google Calendar"
+        }
+      ]
+    },
+  
+    "restaurant": {
+      "task": "Book a table near me for two people tonight",
+      "subtasks": [
+        {
+          "action": "search restaurants",
+          "data_required": ["precise_location", "date"],
+          "third_party": "Google Maps"
+        }
+      ]
+    }
+  }

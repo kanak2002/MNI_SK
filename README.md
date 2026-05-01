@@ -31,26 +31,28 @@ For every task, PersonaGuard assigns one of four decisions:
 
 ---
 
-## System Architecture 
+## System Architecture
 
-User Input
-↓
-Conversation Manager (LLM Layer)
-↓
-Task Decomposition (Claude/OpenRouter)
-↓
-Privacy Classification
-↓
-Governor Engine
-↓
-Decision Path (Permit / Substitute / Confirm / Block)
-↓
-Response Generation (LLM)
-↓
-Privacy Receipt + Audit Logging
-↓
-Frontend UI
-
+```text
+[User Input]
+      ↓
+[Conversation Manager]
+      ↓
+[Task Decomposition]
+      ↓
+[Privacy Classification]
+      ↓
+[Governor Engine]
+      ↓
+[Decision Engine]
+ (Permit / Substitute / Confirm / Block)
+      ↓
+[LLM Response Generation]
+      ↓
+[Privacy Receipt + Audit Log]
+      ↓
+[Frontend UI]
+```
 
 ---
 
@@ -59,7 +61,7 @@ Frontend UI
 ### Shravani — Backend + Governor Engine  
 Owns the privacy decision-making brain.
 
-Responsibilities:
+**Responsibilities:**
 - Persona rules  
 - Third-party trust database  
 - Privacy classifier  
@@ -73,7 +75,7 @@ Responsibilities:
 ### Kanak — LLM Integration + Conversation Logic  
 Owns the AI conversation layer.
 
-Responsibilities:
+**Responsibilities:**
 - Claude/OpenRouter integration  
 - Task decomposition  
 - Conversation state management  
@@ -87,7 +89,7 @@ Responsibilities:
 ### Khushi + Vibe Coding — Frontend + User Experience  
 Owns the user interface.
 
-Responsibilities:
+**Responsibilities:**
 - Chat UI  
 - Persona selection  
 - Confirmation card (Yes / No / Safer alternative)  
@@ -98,45 +100,47 @@ Responsibilities:
 
 ## Folder Structure
 
-
+```
 backend/
-- init.py
-- main.py # FastAPI entry point
-- conversation.py # Conversation manager + LLM integration
-- governor.py # Core decision engine
-- persona_engine.py # Persona rule loader
-- privacy_classifier.py # Data + trust classification
-- privacy_evaluator.py # Privacy scoring + audit signals
-- receipt_generator.py # Privacy receipt builder
-- audit_logger.py # Logs all decisions
-- requirements.txt
-- env.example
+├── __init__.py
+├── main.py                  # FastAPI entry point
+├── conversation.py         # Conversation manager + LLM integration
+├── governor.py             # Core decision engine
+├── persona_engine.py       # Persona rule loader
+├── privacy_classifier.py   # Data + trust classification
+├── privacy_evaluator.py    # Privacy scoring + audit signals
+├── receipt_generator.py    # Privacy receipt builder
+├── audit_logger.py         # Logs all decisions
+├── requirements.txt
+├── env.example
 
 data/
-- personas.json # Persona definitions
-- third_party_trust_db.json # Trust rules for services
+├── personas.json                  # Persona definitions
+├── third_party_trust_db.json     # Trust rules for services
 
 frontend/
-- index.html
-- API_CONTRACT.md
+├── index.html
+├── API_CONTRACT.md
+```
 
 ---
+
 ## Privacy Personas
 
 PersonaGuard supports:
 
 ### Conservative
-- Maximum privacy
-- Blocks most sensitive data
-- Minimal third-party trust
+- Maximum privacy  
+- Blocks most sensitive data  
+- Minimal third-party trust  
 
 ### Balanced
-- Moderate privacy
-- Allows common actions with confirmation
+- Moderate privacy  
+- Allows common actions with confirmation  
 
 ### Convenience-First
-- Minimal friction
-- Allows most actions with logging
+- Minimal friction  
+- Allows most actions with logging  
 
 ---
 
@@ -185,10 +189,10 @@ This creates a **complete audit trail**.
 
 ## Example Flow
 
-User:
+**User:**
 > "Book me a flight to Boston"
 
-System:
+**System:**
 1. Decomposes into subtasks  
 2. Classifies data + trust  
 3. Runs governor decisions  
@@ -209,4 +213,4 @@ System:
 - Prevents hidden data sharing  
 - Makes AI systems transparent  
 - Keeps humans in control  
-- Aligns AI autonomy with privacy
+- Aligns AI autonomy with privacy  

@@ -35,6 +35,9 @@ export const personas = [
 ];
 
 const MOCK_RESPONSE_DELAY_MS = 450;
+const USE_BACKEND = true;
+const ENABLE_FALLBACK = true;
+const API_BASE_URL = "http://localhost:8000";
 
 const sensitiveSignals = [
   "address",
@@ -116,6 +119,11 @@ function hasAnyTerm(message, terms) {
 
 function getSelectedPersona(persona) {
   return personas.find((item) => item.id === persona?.id) || personas[1];
+}
+
+function getBackendPersonaId(persona) {
+  if (persona?.id === "convenience") return "convenience_first";
+  return persona?.id || "balanced";
 }
 
 function inferTaskContext(message) {
@@ -289,6 +297,298 @@ function createFullReceipt({ task, confirmation }) {
   };
 }
 
+function normalizeArray(value) {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function normalizeDecision(decision = {}) {
+  const blockedData = normalizeArray(decision.blocked_data);
+  const substitutions = normalizeArray(decision.substitutions);
+  const rawDecision = (decision.decision || "permit").toLowerCase();
+  const decisionStatus = rawDecision === "blocked" ? "block" : rawDecision;
+
+  return {
+    action: decision.action || "Evaluate task",
+    third_party: decision.third_party || null,
+    decision: decisionStatus,
+    reason: decision.reason || "Evaluated by the selected persona rules.",
+    data_required: normalizeArray(decision.data_required),
+    protected_data: normalizeArray(decision.protected_data || blockedData),
+    confirmation_required: Boolean(
+      decision.confirmation_required ?? decision.confirmation_needed
+    ),
+    substitute_with:
+      decision.substitute_with ||
+      substitutions
+        .map((item) => `${item.original} -> ${item.substitute}`)
+        .join(", ") ||
+      null,
+  };
+}
+
+function flattenSharedItems(shared = []) {
+  return shared.flatMap((item) => {
+    const party = item.party || item.third_party || "Approved third party";
+    return normalizeArray(item.data).map((data) => ({
+      data,
+      party,
+    }));
+  });
+}
+
+function flattenSubstitutionItems(substitutions = []) {
+  return substitutions.flatMap((item) => {
+    const nested = normalizeArray(item.substitutions);
+    if (nested.length) return nested;
+    if (item.original || item.substitute) {
+      return [
+        {
+          original: item.original,
+          substitute: item.substitute,
+        },
+      ];
+    }
+    return [];
+  });
+}
+
+function normalizeReceipt(rawReceipt, rawResponse = {}, originalTask = "") {
+  if (!rawReceipt) return null;
+
+  const summary = rawReceipt.summary || rawReceipt;
+  const shared = flattenSharedItems(normalizeArray(summary.shared || summary.shared_data));
+  const protectedItems = normalizeArray(summary.protected || summary.protected_data);
+  const blocked = normalizeArray(summary.blocked).map((item) => ({
+    data:
+      typeof item === "string"
+        ? item
+        : item.data || item.action || item.third_party || "Blocked action",
+    party:
+      typeof item === "string"
+        ? "Requested third party"
+        : item.party || item.third_party || "Requested third party",
+    reason:
+      typeof item === "string"
+        ? "Blocked by the selected persona rules."
+        : item.reason || "Blocked by the selected persona rules.",
+  }));
+  const substitutions = flattenSubstitutionItems(normalizeArray(summary.substitutions));
+  const confirmations = normalizeArray(summary.confirmations);
+  const isSummary =
+    !rawResponse.task_blocked &&
+    shared.length === 0 &&
+    blocked.length === 0 &&
+    substitutions.length === 0 &&
+    confirmations.length === 0;
+
+  return {
+    type: isSummary ? "summary" : "full",
+    task: rawReceipt.task || rawResponse.task || originalTask,
+    completed: !rawResponse.task_blocked && confirmations.length === 0,
+    shared,
+    protected: protectedItems,
+    blocked,
+    substitutions,
+    deleted_after_task: true,
+    plain_language_summary: rawReceipt.plain_language_summary,
+  };
+}
+
+function createConfirmation(rawResponse = {}, decisions = []) {
+  const confirmationDecision =
+    decisions.find((decision) => decision.confirmation_required) || decisions[0] || {};
+
+  return {
+    required: true,
+    title: "Approve sensitive data sharing?",
+    message:
+      "PersonaGuard needs your approval because this action cannot continue safely without the listed sensitive data.",
+    action: confirmationDecision.action || rawResponse.task || "Continue requested task",
+    third_party: confirmationDecision.third_party,
+    trusted: false,
+    data_required: confirmationDecision.data_required || [],
+    protected_data: confirmationDecision.protected_data || [],
+    blocked_data: confirmationDecision.protected_data || [],
+    substitutions: [],
+  };
+}
+
+function messageFromGovernorResponse(rawResponse = {}) {
+  const receiptSummary = rawResponse.receipt?.plain_language_summary;
+
+  if (rawResponse.task_blocked) {
+    return receiptSummary
+      ? `The task was blocked by the selected persona rules. ${receiptSummary}`
+      : "The task was blocked by the selected persona rules. No sensitive data was shared.";
+  }
+
+  if (rawResponse.confirmation_required) {
+    return receiptSummary
+      ? `The selected persona requires your confirmation before continuing. ${receiptSummary}`
+      : "The selected persona requires your confirmation before continuing.";
+  }
+
+  return (
+    receiptSummary ||
+    "I analyzed the task and cross-checked it against your selected persona. This can continue under the selected privacy rules."
+  );
+}
+
+function isValidGovernorResponse(rawResponse) {
+  return (
+    rawResponse &&
+    typeof rawResponse === "object" &&
+    Array.isArray(rawResponse.decisions) &&
+    typeof rawResponse.confirmation_required === "boolean" &&
+    typeof rawResponse.task_blocked === "boolean"
+  );
+}
+
+function createBlockedReceiptFromDecisions(rawResponse = {}, decisions = [], originalTask = "") {
+  const blockedDecisions = decisions.filter((decision) => decision.decision === "block");
+
+  return {
+    type: "full",
+    task: rawResponse.task || originalTask,
+    completed: false,
+    shared: [],
+    protected: [
+      ...new Set(decisions.flatMap((decision) => decision.protected_data || [])),
+    ],
+    blocked: blockedDecisions.map((decision) => ({
+      data: decision.action,
+      party: decision.third_party || "Requested third party",
+      reason: decision.reason || "Blocked by the selected persona rules.",
+    })),
+    substitutions: [],
+    deleted_after_task: true,
+    plain_language_summary:
+      rawResponse.receipt?.plain_language_summary ||
+      "The requested task was blocked before sensitive data was shared.",
+  };
+}
+
+function normalizeGovernorResponse(rawResponse = {}, originalTask = "", persona) {
+  if (!isValidGovernorResponse(rawResponse)) {
+    console.warn("Governor response was incomplete; using mock response.", rawResponse);
+    return mockSendChatMessage({
+      message: originalTask,
+      persona,
+    });
+  }
+
+  const decisions = normalizeArray(rawResponse.decisions).map(normalizeDecision);
+  const receipt =
+    normalizeReceipt(rawResponse.receipt, rawResponse, originalTask) ||
+    (rawResponse.task_blocked
+      ? createBlockedReceiptFromDecisions(rawResponse, decisions, originalTask)
+      : null);
+
+  return {
+    assistant_message: messageFromGovernorResponse(rawResponse),
+    decisions,
+    confirmation:
+      rawResponse.task_blocked || rawResponse.confirmation_required !== true
+        ? null
+        : createConfirmation(rawResponse, decisions),
+    receipt,
+  };
+}
+
+function createSubtask(action, dataRequired, thirdParty) {
+  return {
+    action,
+    data_required: dataRequired,
+    third_party: thirdParty,
+  };
+}
+
+function buildSubtasksFromMessage(message = "") {
+  const normalized = normalizeMessage(message);
+
+  if (hasAnyTerm(normalized, ["flight", "airline", "airport", "ticket"])) {
+    return [
+      createSubtask("Search flight options", ["Route", "Travel dates", "Passenger count"], "Google Flights"),
+      createSubtask(
+        "Compare booking platforms",
+        ["Route", "Travel dates", "Budget"],
+        "Kayak"
+      ),
+      createSubtask(
+        "Complete booking",
+        ["Legal name", "Contact information", "Payment method"],
+        "Travel provider"
+      ),
+    ];
+  }
+
+  if (hasAnyTerm(normalized, ["hotel", "room", "stay", "reserve"])) {
+    return [
+      createSubtask(
+        "Search hotel inventory",
+        ["Destination", "Stay dates", "Guest count"],
+        "Marriott or hotel provider"
+      ),
+      createSubtask(
+        "Compare hotel platforms",
+        ["Destination", "Stay dates", "Budget"],
+        "Hotels.com"
+      ),
+      createSubtask(
+        "Complete reservation",
+        ["Legal name", "Contact information", "Payment method"],
+        "Hotel provider"
+      ),
+    ];
+  }
+
+  if (hasAnyTerm(normalized, ["buy", "order", "shop", "shopping", "purchase", "checkout"])) {
+    return [
+      createSubtask("Search products", ["Product name", "Preferences", "Budget"], "Amazon"),
+      createSubtask("Prepare order", ["Selected item", "Quantity", "Delivery preference"], "Amazon"),
+      createSubtask("Complete payment", ["Payment method", "Billing details"], "Payment provider"),
+    ];
+  }
+
+  if (hasAnyTerm(normalized, ["calendar", "appointment", "meeting", "schedule"])) {
+    return [
+      createSubtask("Create calendar event", ["Event title", "Time", "Duration"], "Google Calendar"),
+      createSubtask("Sync reminder", ["Event title", "Reminder time"], "Google Calendar"),
+    ];
+  }
+
+  return [
+    createSubtask("Handle task inside PersonaGuard chat", ["Task details"], "None"),
+  ];
+}
+
+async function evaluateWithGovernor(payload) {
+  const backendRequest = {
+    task: payload.message || "",
+    persona: getBackendPersonaId(payload.persona),
+    subtasks: buildSubtasksFromMessage(payload.message || ""),
+  };
+
+  const response = await fetch(`${API_BASE_URL}/governor/evaluate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(backendRequest),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Governor request failed with ${response.status}`);
+  }
+
+  return normalizeGovernorResponse(
+    await response.json(),
+    backendRequest.task,
+    payload.persona
+  );
+}
+
 function baseDecisions(context, persona) {
   return [
     {
@@ -436,10 +736,24 @@ function responseForMessage(message, personaPayload) {
   return allowedResponse(message, persona, context);
 }
 
-export async function sendChatMessage(payload) {
+async function mockSendChatMessage(payload) {
   await waitForMockResponse();
-
   return responseForMessage(payload.message || "", payload.persona);
+}
+
+export async function sendChatMessage(payload) {
+  if (!USE_BACKEND) {
+    return mockSendChatMessage(payload);
+  }
+
+  try {
+    return await evaluateWithGovernor(payload);
+  } catch (error) {
+    if (!ENABLE_FALLBACK) throw error;
+
+    console.warn("Governor backend request failed; using mock response.", error);
+    return mockSendChatMessage(payload);
+  }
 }
 
 export async function sendConfirmationChoice(payload) {

@@ -14,31 +14,39 @@ def generate_receipt(task_result: dict):
     task = task_result.get("task", "")
     persona = task_result.get("persona", "")
     decisions = task_result.get("decisions", [])
+    workflow_outcome = task_result.get("workflow_outcome", "unknown")
 
     shared = []
     protected = []
     blocked = []
     substitutions = []
     confirmations = []
+    stopped_reasons = []
 
     for decision in decisions:
         action = decision.get("action")
         third_party = decision.get("third_party")
         data_required = decision.get("data_required", [])
         decision_type = decision.get("decision")
+        workflow_stage = decision.get("workflow_stage")
+        execution_status = decision.get("execution_status")
 
         if decision_type == "permit":
             shared.append({
                 "action": action,
                 "third_party": third_party,
-                "data": data_required
+                "data": data_required,
+                "workflow_stage": workflow_stage,
+                "execution_status": execution_status
             })
 
         elif decision_type == "substitute":
             substitutions.append({
                 "action": action,
                 "third_party": third_party,
-                "substitutions": decision.get("substitutions", [])
+                "substitutions": decision.get("substitutions", []),
+                "workflow_stage": workflow_stage,
+                "execution_status": execution_status
             })
 
             for item in decision.get("blocked_data", []):
@@ -49,15 +57,22 @@ def generate_receipt(task_result: dict):
                 "action": action,
                 "third_party": third_party,
                 "data": data_required,
-                "reason": decision.get("reason")
+                "reason": decision.get("reason"),
+                "workflow_stage": workflow_stage,
+                "execution_status": execution_status
             })
 
         elif decision_type == "block":
-            blocked.append({
+            blocked_item = {
                 "action": action,
                 "third_party": third_party,
-                "reason": decision.get("reason")
-            })
+                "reason": decision.get("reason"),
+                "workflow_stage": workflow_stage,
+                "execution_status": execution_status
+            }
+
+            blocked.append(blocked_item)
+            stopped_reasons.append(decision.get("reason"))
 
             for item in decision.get("blocked_data", []):
                 protected.append(item)
@@ -65,24 +80,34 @@ def generate_receipt(task_result: dict):
     return {
         "task": task,
         "persona": persona,
+        "workflow_outcome": workflow_outcome,
         "summary": {
             "shared": shared,
             "protected": list(set(protected)),
             "blocked": blocked,
             "substitutions": substitutions,
-            "confirmations": confirmations
+            "confirmations": confirmations,
+            "stopped_reasons": stopped_reasons
         },
         "plain_language_summary": build_plain_language_summary(
             shared,
             protected,
             blocked,
             substitutions,
-            confirmations
+            confirmations,
+            workflow_outcome
         )
     }
 
 
-def build_plain_language_summary(shared, protected, blocked, substitutions, confirmations):
+def build_plain_language_summary(
+    shared,
+    protected,
+    blocked,
+    substitutions,
+    confirmations,
+    workflow_outcome
+):
     """
     Creates a short readable summary for chatbot response.
     """
@@ -90,6 +115,18 @@ def build_plain_language_summary(shared, protected, blocked, substitutions, conf
     lines = []
 
     lines.append("Privacy receipt generated.")
+
+    if workflow_outcome == "completed":
+        lines.append("Task was completed with available data.")
+
+    if workflow_outcome == "completed_with_alternative":
+        lines.append("Task was completed using safer alternative data.")
+
+    if workflow_outcome == "waiting_for_user":
+        lines.append("Task is waiting for user approval.")
+
+    if workflow_outcome == "stopped_with_reason":
+        lines.append("Task was stopped because no safe option was available.")
 
     if shared:
         lines.append(f"{len(shared)} action(s) were permitted.")

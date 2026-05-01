@@ -7,6 +7,7 @@ export default function PersonaBadge({ persona }) {
     <div className="persona-badge" aria-label={`Active persona: ${persona.name}`}>
       <ShieldCheck size={16} aria-hidden="true" />
       <span>{persona.name}</span>
+      <small>{persona.tone}</small>
     </div>
   );
 }

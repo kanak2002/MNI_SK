@@ -7,6 +7,12 @@ const icons = {
   convenience: Zap,
 };
 
+const descriptions = {
+  conservative: "Ask before sensitive sharing. Block risky third parties.",
+  balanced: "Minimize exposed data while keeping tasks practical.",
+  convenience: "Move quickly, but still flag high-risk actions.",
+};
+
 export default function PersonaCards({ disabled = false, selectedId, onSelect }) {
   return (
     <div className="persona-grid" role="list" aria-label="Privacy comfort levels">
@@ -31,7 +37,9 @@ export default function PersonaCards({ disabled = false, selectedId, onSelect })
                 <span className="persona-name">{persona.name}</span>
                 <span className="persona-tone">{persona.tone}</span>
               </span>
-              <span className="persona-summary">{persona.summary}</span>
+              <span className="persona-summary">
+                {descriptions[persona.id] || persona.summary}
+              </span>
             </span>
           </button>
         );

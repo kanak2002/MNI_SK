@@ -1,6 +1,9 @@
 import { Check, Eye, ShieldAlert, X } from "lucide-react";
 
 export default function ConfirmationCard({ confirmation, disabled = false, onChoice }) {
+  const dataRequired = confirmation.data_required || [];
+  const protectedData = confirmation.protected_data || [];
+
   return (
     <section className="confirmation-card" aria-label="Privacy confirmation">
       <div className="card-heading">
@@ -29,19 +32,27 @@ export default function ConfirmationCard({ confirmation, disabled = false, onCho
       <div className="decision-columns">
         <div>
           <h3>Data to share</h3>
-          <ul>
-            {confirmation.data_required.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
+          {dataRequired.length > 0 ? (
+            <ul>
+              {dataRequired.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>No sensitive data required.</p>
+          )}
         </div>
         <div>
           <h3>Stays protected</h3>
-          <ul>
-            {confirmation.protected_data.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
+          {protectedData.length > 0 ? (
+            <ul>
+              {protectedData.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>No extra protected fields listed.</p>
+          )}
         </div>
       </div>
 
@@ -52,6 +63,15 @@ export default function ConfirmationCard({ confirmation, disabled = false, onCho
       </div>
 
       <div className="confirmation-actions">
+        <button
+          className="primary-action"
+          disabled={disabled}
+          onClick={() => onChoice("approve")}
+          type="button"
+        >
+          <Check size={16} aria-hidden="true" />
+          Yes, proceed
+        </button>
         <button
           className="secondary-action"
           disabled={disabled}
@@ -69,15 +89,6 @@ export default function ConfirmationCard({ confirmation, disabled = false, onCho
         >
           <Eye size={16} aria-hidden="true" />
           See safer alternative
-        </button>
-        <button
-          className="primary-action"
-          disabled={disabled}
-          onClick={() => onChoice("approve")}
-          type="button"
-        >
-          <Check size={16} aria-hidden="true" />
-          Yes, proceed
         </button>
       </div>
     </section>

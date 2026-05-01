@@ -36,15 +36,197 @@ export const personas = [
 
 const MOCK_RESPONSE_DELAY_MS = 450;
 
+const sensitiveSignals = [
+  "address",
+  "bank",
+  "card",
+  "credit",
+  "debit",
+  "email",
+  "health",
+  "home",
+  "id",
+  "medical",
+  "passport",
+  "password",
+  "payment",
+  "phone",
+  "ssn",
+  "social security",
+];
+
+const externalActionSignals = [
+  "agent",
+  "airline",
+  "amazon",
+  "appointment",
+  "book",
+  "buy",
+  "calendar",
+  "checkout",
+  "delivery",
+  "flight",
+  "hotel",
+  "order",
+  "pay",
+  "purchase",
+  "reserve",
+  "schedule",
+  "send",
+  "shop",
+  "submit",
+  "ticket",
+];
+
+const confirmationSignals = [
+  "bank",
+  "card",
+  "checkout",
+  "credit",
+  "debit",
+  "finalize",
+  "id",
+  "login",
+  "passport",
+  "password",
+  "pay",
+  "payment",
+  "purchase",
+  "send my",
+  "share my",
+  "ssn",
+  "submit",
+  "use my card",
+];
+
 function waitForMockResponse() {
   return new Promise((resolve) => {
     window.setTimeout(resolve, MOCK_RESPONSE_DELAY_MS);
   });
 }
 
+function normalizeMessage(message = "") {
+  return message.toLowerCase();
+}
+
 function hasAnyTerm(message, terms) {
-  const normalizedMessage = message.toLowerCase();
+  const normalizedMessage = normalizeMessage(message);
   return terms.some((term) => normalizedMessage.includes(term));
+}
+
+function getSelectedPersona(persona) {
+  return personas.find((item) => item.id === persona?.id) || personas[1];
+}
+
+function inferTaskContext(message) {
+  const normalized = normalizeMessage(message);
+  const requiresExternalAction = hasAnyTerm(normalized, externalActionSignals);
+  const mentionsSensitiveData = hasAnyTerm(normalized, sensitiveSignals);
+  const requiresConfirmationData = hasAnyTerm(normalized, confirmationSignals);
+
+  if (hasAnyTerm(normalized, ["flight", "airline", "airport", "ticket"])) {
+    return {
+      destination: "Travel provider",
+      requiredData: ["Route", "Passenger count", "Timing preference"],
+      sensitiveData: ["Legal name", "Payment method", "Passport or government ID"],
+      protectedData: ["Passport or government ID", "Payment details", "Unrelated travel history"],
+      alternative: "Search with route, passenger count, and a flexible travel window first.",
+      blocked: ["Passport or government ID", "Payment details"],
+      requiresExternalAction,
+      mentionsSensitiveData: true,
+      requiresConfirmationData,
+    };
+  }
+
+  if (hasAnyTerm(normalized, ["hotel", "room", "stay", "reserve"])) {
+    return {
+      destination: "Hotel or booking provider",
+      requiredData: ["City or area", "Stay dates", "Guest count"],
+      sensitiveData: ["Name", "Payment method", "Exact address"],
+      protectedData: ["Home address", "Saved payment credentials", "Government ID"],
+      alternative: "Search by city or neighborhood and hold payment details until checkout.",
+      blocked: ["Saved payment credentials", "Government ID"],
+      requiresExternalAction,
+      mentionsSensitiveData: true,
+      requiresConfirmationData,
+    };
+  }
+
+  if (hasAnyTerm(normalized, ["buy", "order", "shop", "shopping", "purchase", "checkout"])) {
+    return {
+      destination: "Retailer or marketplace",
+      requiredData: ["Item", "Quantity", "Preferences"],
+      sensitiveData: ["Payment method", "Shipping address", "Account details"],
+      protectedData: ["Account password", "Saved cards not selected", "Unrelated purchase history"],
+      alternative: "Prepare the cart using product preferences and use delivery area instead of full address.",
+      blocked: ["Account password", "Unrelated purchase history"],
+      requiresExternalAction,
+      mentionsSensitiveData: true,
+      requiresConfirmationData,
+    };
+  }
+
+  if (hasAnyTerm(normalized, ["calendar", "appointment", "meeting", "schedule"])) {
+    return {
+      destination: "Calendar or scheduling provider",
+      requiredData: ["Event title", "Preferred time", "Duration"],
+      sensitiveData: ["Full calendar details", "Private notes", "Unrelated attendees"],
+      protectedData: ["Existing event titles", "Private notes", "Unrelated calendar locations"],
+      alternative: "Use free/busy windows instead of exposing full calendar details.",
+      blocked: ["Private notes", "Unrelated calendar content"],
+      requiresExternalAction,
+      mentionsSensitiveData,
+      requiresConfirmationData,
+    };
+  }
+
+  if (hasAnyTerm(normalized, ["email", "message", "send", "contact"])) {
+    return {
+      destination: "Message recipient or communication service",
+      requiredData: ["Message content", "Recipient"],
+      sensitiveData: ["Email address", "Phone number", "Private context"],
+      protectedData: ["Unrelated contacts", "Private account data", "Precise location"],
+      alternative: "Draft the message in chat and let you send it manually.",
+      blocked: ["Unrelated contacts", "Private account data"],
+      requiresExternalAction,
+      mentionsSensitiveData,
+      requiresConfirmationData,
+    };
+  }
+
+  return {
+    destination: requiresExternalAction ? "Requested external service" : "None",
+    requiredData: ["User-provided task details"],
+    sensitiveData: mentionsSensitiveData
+      ? ["Sensitive details mentioned in the task"]
+      : ["No sensitive data required"],
+    protectedData: ["Personal identifiers", "Account data", "Payment data", "Precise location"],
+    alternative: requiresExternalAction
+      ? "Continue with only the minimum task details and avoid sensitive fields."
+      : null,
+    blocked: ["Unnecessary personal details", "Unneeded third-party sharing"],
+    requiresExternalAction,
+    mentionsSensitiveData,
+    requiresConfirmationData,
+  };
+}
+
+function personaRequiresConfirmation(persona, context) {
+  if (context.requiresConfirmationData) return true;
+  if (persona.id === "conservative") {
+    return context.requiresExternalAction && context.mentionsSensitiveData;
+  }
+  if (persona.id === "balanced") {
+    return context.requiresExternalAction && context.mentionsSensitiveData && !context.alternative;
+  }
+  return context.requiresExternalAction && context.requiresConfirmationData;
+}
+
+function canUseSaferAlternative(persona, context) {
+  if (!context.alternative) return false;
+  if (context.requiresConfirmationData) return false;
+  if (persona.id === "convenience" && !context.mentionsSensitiveData) return false;
+  return context.requiresExternalAction || context.mentionsSensitiveData;
 }
 
 function createSummaryReceipt(task, protectedItems) {
@@ -60,353 +242,29 @@ function createSummaryReceipt(task, protectedItems) {
   };
 }
 
-function simpleTaskResponse(message) {
+function createAlternativeReceipt(task, context) {
   return {
-    assistant_message:
-      "This can be handled inside PersonaGuard chat without contacting external services. Share the study topic, notes, or question you want help with, and I will keep personal records out of the task.",
-    decisions: [
+    type: "full",
+    task,
+    completed: true,
+    shared: context.requiredData.map((data) => ({
+      data,
+      party: context.destination,
+    })),
+    protected: context.protectedData,
+    blocked: context.blocked.map((data) => ({
+      data,
+      party: context.destination,
+      reason: "Not required for the safer alternative.",
+    })),
+    substitutions: [
       {
-        action: "Handle request inside chat",
-        third_party: "None",
-        decision: "permit",
-        reason: "This task can be completed without contacting an external service.",
-        data_required: ["User-provided message only"],
-        substitute_with: null,
-      },
-      {
-        action: "Protect personal records",
-        third_party: "None",
-        decision: "block",
-        reason: "No academic records, accounts, or sensitive documents are shared.",
-        data_required: [],
-        substitute_with: null,
+        original: context.sensitiveData.join(", "),
+        substitute: context.alternative,
       },
     ],
-    confirmation: null,
-    receipt: createSummaryReceipt(message, [
-      "Personal records",
-      "Account data",
-      "Private documents",
-    ]),
+    deleted_after_task: true,
   };
-}
-
-function flightTaskResponse() {
-  return {
-    assistant_message:
-      "I analyzed the flight booking request for privacy requirements. Flight booking can involve identity, payment, and travel-pattern data, so I will minimize what is shared and ask before sending sensitive details.",
-    decisions: [
-      {
-        action: "Search route and availability",
-        third_party: "Airline or booking service",
-        decision: "permit",
-        reason: "Route, passenger count, and broad timing can be used before identity details are required.",
-        data_required: ["Origin", "Destination", "Passenger count"],
-        substitute_with: null,
-      },
-      {
-        action: "Use flexible travel date first",
-        third_party: "Airline or booking service",
-        decision: "substitute",
-        reason: "A flexible date range reduces exposure of exact travel plans during early search.",
-        data_required: ["Exact travel date"],
-        substitute_with: "Flexible date window",
-      },
-      {
-        action: "Share passenger and payment details only after approval",
-        third_party: "Airline or booking service",
-        decision: "confirm",
-        reason: "Legal name, exact travel date, and payment details are sensitive booking data.",
-        data_required: ["Passenger name", "Payment method", "Travel date"],
-        substitute_with: null,
-      },
-      {
-        action: "Block unrelated identity documents",
-        third_party: "Airline or booking service",
-        decision: "block",
-        reason: "Passport or government ID is not shared until the selected itinerary requires it.",
-        data_required: [],
-        substitute_with: null,
-      },
-    ],
-    confirmation: {
-      required: true,
-      title: "Approve flight booking details?",
-      message:
-        "PersonaGuard needs your approval before sharing passenger name, payment method, and exact travel date with an airline or booking service.",
-      action: "Share required flight booking details",
-      third_party: "Airline or booking service",
-      trusted: true,
-      data_required: ["Passenger name", "Payment method", "Travel date"],
-      protected_data: ["Passport number", "Loyalty account", "Unrelated identity documents"],
-      blocked_data: ["Unrelated identity documents"],
-      substitutions: [
-        {
-          original: "Exact travel date during search",
-          substitute: "Flexible date window",
-        },
-      ],
-    },
-    receipt: null,
-  };
-}
-
-function hotelTaskResponse() {
-  return {
-    assistant_message:
-      "I analyzed the hotel booking request for privacy requirements. I can use non-identifying stay preferences first, substitute broader location data, and ask before sharing payment or contact details.",
-    decisions: [
-      {
-        action: "Search stays by basic preferences",
-        third_party: "Selected hotel provider",
-        decision: "permit",
-        reason: "Guest count, dates, and room preferences can start the booking flow.",
-        data_required: ["Stay dates", "Guest count", "Room preference"],
-        substitute_with: null,
-      },
-      {
-        action: "Use city-level location",
-        third_party: "Selected hotel provider",
-        decision: "substitute",
-        reason: "City-level search avoids exposing exact address or precise location.",
-        data_required: ["Precise location"],
-        substitute_with: "City or neighborhood only",
-      },
-      {
-        action: "Approve contact and payment details",
-        third_party: "Selected hotel provider",
-        decision: "confirm",
-        reason: "Name, email, and payment information are sensitive and should be approved first.",
-        data_required: ["Name", "Email", "Payment method"],
-        substitute_with: null,
-      },
-      {
-        action: "Block tracking and personalization",
-        third_party: "Selected hotel provider",
-        decision: "block",
-        reason: "Marketing tracking, profile enrichment, and unrelated personalization are not required for booking.",
-        data_required: [],
-        substitute_with: null,
-      },
-    ],
-    confirmation: {
-      required: true,
-      title: "Approve hotel booking details?",
-      message:
-        "PersonaGuard needs your approval before sharing name, email, and payment information with the selected hotel provider.",
-      action: "Share required hotel booking details",
-      third_party: "Selected hotel provider",
-      trusted: true,
-      data_required: ["Name", "Email", "Payment method"],
-      protected_data: ["Home address", "Government ID", "Saved payment credentials"],
-      blocked_data: ["Tracking data", "Personalization profile"],
-      substitutions: [
-        {
-          original: "Precise location",
-          substitute: "City or neighborhood only",
-        },
-      ],
-    },
-    receipt: null,
-  };
-}
-
-function calendarTaskResponse() {
-  return {
-    assistant_message:
-      "I analyzed the calendar scheduling request for privacy requirements. Calendar tasks can reveal availability, event context, and contacts, so I will share only what is needed for scheduling.",
-    decisions: [
-      {
-        action: "Prepare event details",
-        third_party: "Calendar provider",
-        decision: "permit",
-        reason: "Event title, time, and duration are needed to create or coordinate the appointment.",
-        data_required: ["Event title", "Event time", "Duration"],
-        substitute_with: null,
-      },
-      {
-        action: "Use free/busy availability",
-        third_party: "Calendar provider",
-        decision: "substitute",
-        reason: "Free/busy windows avoid exposing unrelated calendar entries.",
-        data_required: ["Full calendar details"],
-        substitute_with: "Free/busy availability only",
-      },
-      {
-        action: "Approve external calendar sync",
-        third_party: "Calendar provider",
-        decision: "confirm",
-        reason: "External sync may share event title, time, attendee, and reminder data.",
-        data_required: ["Event title", "Event time", "Attendee or provider"],
-        substitute_with: null,
-      },
-      {
-        action: "Block unrelated calendar content",
-        third_party: "Calendar provider",
-        decision: "block",
-        reason: "Existing event titles, attendees, notes, and locations are not needed.",
-        data_required: [],
-        substitute_with: null,
-      },
-    ],
-    confirmation: {
-      required: true,
-      title: "Approve calendar sync?",
-      message:
-        "PersonaGuard needs your approval before sharing event title, time, and scheduling details with an external calendar provider.",
-      action: "Sync limited calendar event",
-      third_party: "Calendar provider",
-      trusted: true,
-      data_required: ["Event title", "Event time", "Attendee or provider"],
-      protected_data: ["Existing event titles", "Private notes", "Unrelated attendees", "Unrelated locations"],
-      blocked_data: ["Existing event titles", "Private notes", "Unrelated attendees"],
-      substitutions: [
-        {
-          original: "Full calendar details",
-          substitute: "Free/busy availability only",
-        },
-      ],
-    },
-    receipt: null,
-  };
-}
-
-function shoppingTaskResponse() {
-  return {
-    assistant_message:
-      "I analyzed the shopping request for privacy requirements. I can separate product selection from checkout details and ask before purchase, payment, or shipping data is shared.",
-    decisions: [
-      {
-        action: "Search or prepare cart from item preferences",
-        third_party: "Retailer or marketplace",
-        decision: "permit",
-        reason: "Product, quantity, and preference details can be used before checkout.",
-        data_required: ["Product", "Quantity", "Preferences"],
-        substitute_with: null,
-      },
-      {
-        action: "Use delivery area before exact address",
-        third_party: "Retailer or marketplace",
-        decision: "substitute",
-        reason: "A delivery area is enough for estimates before purchase.",
-        data_required: ["Full shipping address"],
-        substitute_with: "Delivery area or ZIP code",
-      },
-      {
-        action: "Approve purchase and payment details",
-        third_party: "Retailer or marketplace",
-        decision: "confirm",
-        reason: "Purchase completion requires payment and shipping data.",
-        data_required: ["Payment method", "Shipping address", "Order contents"],
-        substitute_with: null,
-      },
-      {
-        action: "Block account credentials and unrelated profile data",
-        third_party: "Retailer or marketplace",
-        decision: "block",
-        reason: "Passwords, saved cards, and unrelated purchase history are not needed.",
-        data_required: [],
-        substitute_with: null,
-      },
-    ],
-    confirmation: {
-      required: true,
-      title: "Approve purchase details?",
-      message:
-        "PersonaGuard needs your approval before sharing payment, shipping, and order details with a retailer or marketplace.",
-      action: "Share checkout details",
-      third_party: "Retailer or marketplace",
-      trusted: true,
-      data_required: ["Payment method", "Shipping address", "Order contents"],
-      protected_data: ["Account password", "Saved cards not selected", "Unrelated purchase history"],
-      blocked_data: ["Account password", "Unrelated profile data"],
-      substitutions: [
-        {
-          original: "Full shipping address before checkout",
-          substitute: "Delivery area or ZIP code",
-        },
-      ],
-    },
-    receipt: null,
-  };
-}
-
-function unknownTaskResponse(message) {
-  return {
-    assistant_message:
-      "I can help with that. I’ll first check what data is required and avoid external sharing unless it is necessary.",
-    decisions: [
-      {
-        action: "Start inside chat",
-        third_party: "None",
-        decision: "permit",
-        reason: "I can clarify the task before using any external service.",
-        data_required: ["User-provided message only"],
-        substitute_with: null,
-      },
-      {
-        action: "Protect sensitive data by default",
-        third_party: "None",
-        decision: "block",
-        reason: "Personal details, account access, payment data, and precise location are not shared unless required and approved.",
-        data_required: [],
-        substitute_with: null,
-      },
-      {
-        action: "No confirmation needed",
-        third_party: "None",
-        decision: "permit",
-        reason: "No external action or sensitive sharing is needed yet.",
-        data_required: [],
-        substitute_with: null,
-      },
-    ],
-    confirmation: null,
-    receipt: createSummaryReceipt(message, [
-      "Personal details",
-      "Account data",
-      "Payment data",
-      "Precise location",
-    ]),
-  };
-}
-
-function responseForMessage(message) {
-  if (
-    hasAnyTerm(message, [
-      "study",
-      "studies",
-      "homework",
-      "notes",
-      "learn",
-      "explain",
-      "machine learning",
-      "practice",
-      "brainstorm",
-      "draft",
-      "write notes",
-    ])
-  ) {
-    return simpleTaskResponse(message);
-  }
-
-  if (hasAnyTerm(message, ["flight", "airline", "airport", "plane", "ticket"])) {
-    return flightTaskResponse();
-  }
-
-  if (hasAnyTerm(message, ["hotel", "stay", "room", "booking"])) {
-    return hotelTaskResponse();
-  }
-
-  if (hasAnyTerm(message, ["calendar", "appointment", "schedule", "meeting", "dentist"])) {
-    return calendarTaskResponse();
-  }
-
-  if (hasAnyTerm(message, ["buy", "order", "shopping", "groceries", "amazon", "purchase"])) {
-    return shoppingTaskResponse();
-  }
-
-  return unknownTaskResponse(message);
 }
 
 function createFullReceipt({ task, confirmation }) {
@@ -431,10 +289,157 @@ function createFullReceipt({ task, confirmation }) {
   };
 }
 
+function baseDecisions(context, persona) {
+  return [
+    {
+      action: "Analyze task and required data",
+      third_party: context.destination,
+      decision: "permit",
+      reason: `${persona.name} allows the task analysis using only the message you provided.`,
+      data_required: context.requiredData,
+      protected_data: [],
+      confirmation_required: false,
+      substitute_with: null,
+    },
+    {
+      action: "Cross-check selected persona rules",
+      third_party: "PersonaGuard",
+      decision: "permit",
+      reason: `${persona.name} rules were applied before any external action or sensitive sharing.`,
+      data_required: [persona.name],
+      protected_data: persona.rules,
+      confirmation_required: false,
+      substitute_with: null,
+    },
+  ];
+}
+
+function allowedResponse(message, persona, context) {
+  return {
+    assistant_message:
+      "I analyzed the task and cross-checked it against your selected persona. This can continue without sensitive sharing or external approval.",
+    decisions: [
+      ...baseDecisions(context, persona),
+      {
+        action: "Continue safely",
+        third_party: context.destination,
+        decision: "permit",
+        reason: "The task can proceed with low-risk data only.",
+        data_required: context.requiredData,
+        protected_data: context.protectedData,
+        confirmation_required: false,
+        substitute_with: null,
+      },
+      {
+        action: "Block unnecessary sensitive data",
+        third_party: context.destination,
+        decision: "block",
+        reason: "PersonaGuard does not need identifiers, account access, payment data, or precise location for this step.",
+        data_required: [],
+        protected_data: context.protectedData,
+        confirmation_required: false,
+        substitute_with: null,
+      },
+    ],
+    confirmation: null,
+    receipt: createSummaryReceipt(message, context.protectedData),
+  };
+}
+
+function alternativeResponse(message, persona, context) {
+  return {
+    assistant_message: `I analyzed the task and found a safer path under ${persona.name}. I will continue with this alternative: ${context.alternative}`,
+    decisions: [
+      ...baseDecisions(context, persona),
+      {
+        action: "Use safer alternative",
+        third_party: context.destination,
+        decision: "substitute",
+        reason: "The original path could expose sensitive or unnecessary data, but a lower-risk substitute can still move the task forward.",
+        data_required: context.sensitiveData,
+        protected_data: context.protectedData,
+        confirmation_required: false,
+        substitute_with: context.alternative,
+      },
+      {
+        action: "Block unnecessary disclosure",
+        third_party: context.destination,
+        decision: "block",
+        reason: "PersonaGuard blocks data that is not required for the safer alternative.",
+        data_required: [],
+        protected_data: context.blocked,
+        confirmation_required: false,
+        substitute_with: null,
+      },
+    ],
+    confirmation: null,
+    receipt: createAlternativeReceipt(message, context),
+  };
+}
+
+function confirmationResponse(persona, context) {
+  return {
+    assistant_message:
+      "I analyzed the task and cross-checked it against your selected persona. There is no safe alternative that can complete this action without sharing sensitive data, so I need your confirmation before continuing.",
+    decisions: [
+      ...baseDecisions(context, persona),
+      {
+        action: "Require confirmation before execution",
+        third_party: context.destination,
+        decision: "confirm",
+        reason: `${persona.name} requires approval before this sensitive action can proceed.`,
+        data_required: context.sensitiveData,
+        protected_data: context.protectedData,
+        confirmation_required: true,
+        substitute_with: null,
+      },
+      {
+        action: "Block execution until approved",
+        third_party: context.destination,
+        decision: "block",
+        reason: "No sensitive data is shared unless you approve the confirmation card.",
+        data_required: [],
+        protected_data: context.protectedData,
+        confirmation_required: true,
+        substitute_with: null,
+      },
+    ],
+    confirmation: {
+      required: true,
+      title: "Approve sensitive data sharing?",
+      message:
+        "PersonaGuard needs your approval because this action cannot continue safely without the listed sensitive data.",
+      action: "Continue requested task",
+      third_party: context.destination,
+      trusted: false,
+      data_required: context.sensitiveData,
+      protected_data: context.protectedData,
+      blocked_data: context.blocked,
+      substitutions: [],
+    },
+    receipt: null,
+  };
+}
+
+function responseForMessage(message, personaPayload) {
+  const persona = getSelectedPersona(personaPayload);
+  const context = inferTaskContext(message);
+
+  if (canUseSaferAlternative(persona, context)) {
+    return alternativeResponse(message, persona, context);
+  }
+
+  if (personaRequiresConfirmation(persona, context)) {
+    return confirmationResponse(persona, context);
+  }
+
+  return allowedResponse(message, persona, context);
+}
+
 export async function sendChatMessage(payload) {
   await waitForMockResponse();
 
-  return responseForMessage(payload.message || "");
+  return responseForMessage(payload.message || "", payload.persona);
 }
 
 export async function sendConfirmationChoice(payload) {
@@ -442,7 +447,8 @@ export async function sendConfirmationChoice(payload) {
 
   if (payload.choice === "yes") {
     return {
-      assistant_message: "Approved. I’ll proceed using the privacy-safe path.",
+      assistant_message:
+        "Approved. I will continue execution using only the approved data and keep the rest protected.",
       confirmation: null,
       receipt: createFullReceipt(payload),
     };
@@ -450,7 +456,8 @@ export async function sendConfirmationChoice(payload) {
 
   if (payload.choice === "no") {
     return {
-      assistant_message: "Cancelled. I did not share the sensitive data for this action.",
+      assistant_message:
+        "Cancelled. I did not share the sensitive data for this action.",
       confirmation: null,
       receipt: null,
     };
@@ -458,7 +465,7 @@ export async function sendConfirmationChoice(payload) {
 
   return {
     assistant_message:
-      "Safer alternative: I can continue using only lower-risk data, avoid external services, or ask you to manually complete the sensitive step.",
+      "Safer alternative: I can continue with lower-risk data only, avoid external services, or leave the sensitive step for you to complete manually.",
     confirmation: null,
     receipt: null,
   };

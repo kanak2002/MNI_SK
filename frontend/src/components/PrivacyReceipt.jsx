@@ -1,8 +1,13 @@
 import { CheckCircle2, ClipboardList, RotateCcw, ShieldCheck } from "lucide-react";
 
 export default function PrivacyReceipt({ receipt }) {
+  const shared = receipt.shared || [];
+  const protectedItemsAll = receipt.protected || [];
+  const blocked = receipt.blocked || [];
+  const substitutions = receipt.substitutions || [];
+
   if (receipt.type === "summary" || receipt.compact) {
-    const protectedItems = receipt.protected?.slice(0, 3) || [];
+    const protectedItems = protectedItemsAll.slice(0, 3);
 
     return (
       <section className="privacy-receipt privacy-summary" aria-label="Privacy summary">
@@ -47,9 +52,9 @@ export default function PrivacyReceipt({ receipt }) {
       <div className="receipt-grid">
         <div>
           <h3>Shared</h3>
-          {receipt.shared.length ? (
+          {shared.length ? (
             <ul>
-              {receipt.shared.map((item) => (
+              {shared.map((item) => (
                 <li key={`${item.data}-${item.party}`}>
                   {item.data} with {item.party}
                 </li>
@@ -61,21 +66,25 @@ export default function PrivacyReceipt({ receipt }) {
         </div>
         <div>
           <h3>Protected</h3>
-          <ul>
-            {receipt.protected.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
+          {protectedItemsAll.length ? (
+            <ul>
+              {protectedItemsAll.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>No additional protected data listed.</p>
+          )}
         </div>
       </div>
 
-      {(receipt.blocked.length > 0 || receipt.substitutions.length > 0) && (
+      {(blocked.length > 0 || substitutions.length > 0) && (
         <div className="receipt-grid">
-          {receipt.substitutions.length > 0 && (
+          {substitutions.length > 0 && (
             <div>
               <h3>Substitutions</h3>
               <ul>
-                {receipt.substitutions.map((item) => (
+                {substitutions.map((item) => (
                   <li key={`${item.original}-${item.substitute}`}>
                     {item.original}: {item.substitute}
                   </li>
@@ -83,11 +92,11 @@ export default function PrivacyReceipt({ receipt }) {
               </ul>
             </div>
           )}
-          {receipt.blocked.length > 0 && (
+          {blocked.length > 0 && (
             <div>
               <h3>Blocked</h3>
               <ul>
-                {receipt.blocked.map((item) => (
+                {blocked.map((item) => (
                   <li key={`${item.data || item.party}-${item.reason}`}>
                     {item.data ? `${item.data}: ` : `${item.party}: `}
                     {item.reason}

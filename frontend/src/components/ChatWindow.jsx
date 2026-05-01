@@ -13,13 +13,35 @@ const initialMessage = {
   text: "Hi, I\u2019m PersonaGuard. Before we start, what\u2019s your privacy comfort level?",
 };
 
+const quickReplies = [
+  {
+    id: "start-task",
+    label: "Start a task",
+    response: "Great — tell me what you\u2019d like the agent to do.",
+  },
+  {
+    id: "compare-personas",
+    label: "Compare personas",
+    response:
+      "Conservative uses maximum caution and asks before sensitive sharing. Balanced is recommended because it minimizes exposed data while keeping tasks practical. Convenience-First moves faster, shares routine details more freely, and still flags high-risk actions.",
+  },
+  {
+    id: "customize-rules",
+    label: "Customize rules",
+    response:
+      "Customization will be available soon. For this demo, I\u2019ll continue with your selected persona.",
+  },
+];
+
+quickReplies[0].response = "Great \u2014 tell me what you\u2019d like the agent to do.";
+
 function DecisionList({ decisions = [] }) {
   if (!decisions.length) return null;
 
   const labels = {
     permit: "PERMIT",
     protect: "PROTECT",
-    substitute: "PROTECT",
+    substitute: "SUBSTITUTE",
     confirm: "APPROVAL",
     block: "BLOCKED",
   };
@@ -79,7 +101,7 @@ function TypingIndicator() {
   return (
     <div className="typing-indicator" role="status" aria-live="polite">
       <LoaderCircle size={16} aria-hidden="true" />
-      <span>Checking privacy rules...</span>
+      <span>{"Analyzing privacy rules\u2026"}</span>
     </div>
   );
 }
@@ -90,6 +112,7 @@ function MessageBubble({
   selectedPersona,
   onSelectPersona,
   onConfirmationChoice,
+  onQuickReply,
 }) {
   const isUser = message.role === "user";
 
@@ -107,6 +130,20 @@ function MessageBubble({
             selectedId={selectedPersona?.id}
             onSelect={onSelectPersona}
           />
+        )}
+        {message.type === "quick-replies" && !message.used && (
+          <div className="quick-reply-row" aria-label="Suggested next steps">
+            {quickReplies.map((reply) => (
+              <button
+                className="quick-reply"
+                key={reply.id}
+                onClick={() => onQuickReply(message.id, reply)}
+                type="button"
+              >
+                {reply.label}
+              </button>
+            ))}
+          </div>
         )}
         {message.decisions && <DecisionList decisions={message.decisions} />}
         {message.type === "confirmation" && (
@@ -128,14 +165,21 @@ export default function ChatWindow() {
   const [inputValue, setInputValue] = useState("");
   const [pendingConfirmation, setPendingConfirmation] = useState(null);
   const [isChecking, setIsChecking] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
   const inputRef = useRef(null);
   const messageListRef = useRef(null);
   const bottomRef = useRef(null);
 
   const canSend = useMemo(
     () =>
-      Boolean(selectedPersona && inputValue.trim() && !pendingConfirmation && !isChecking),
-    [inputValue, isChecking, pendingConfirmation, selectedPersona]
+      Boolean(
+        selectedPersona &&
+          inputValue.trim() &&
+          !pendingConfirmation &&
+          !isChecking &&
+          !isConfirming
+      ),
+    [inputValue, isChecking, isConfirming, pendingConfirmation, selectedPersona]
   );
 
   function appendMessages(nextMessages) {
@@ -179,7 +223,36 @@ export default function ChatWindow() {
       {
         id: `rules-${persona.id}`,
         role: "assistant",
-        text: `You\u2019re set to ${persona.name}. ${persona.rules.join(" ")}`,
+        text: `You\u2019re set to ${persona.name}. In plain language: ${persona.rules.join(" ")}`,
+      },
+      {
+        id: `quick-${persona.id}`,
+        role: "assistant",
+        type: "quick-replies",
+        text: "You can type a task directly, or choose a quick next step.",
+      },
+    ]);
+
+    window.requestAnimationFrame(() => inputRef.current?.focus());
+  }
+
+  function handleQuickReply(messageId, reply) {
+    setMessages((current) =>
+      current.map((message) =>
+        message.id === messageId ? { ...message, used: true } : message
+      )
+    );
+
+    appendMessages([
+      {
+        id: `quick-user-${reply.id}-${Date.now()}`,
+        role: "user",
+        text: reply.label,
+      },
+      {
+        id: `quick-response-${reply.id}-${Date.now()}`,
+        role: "assistant",
+        text: reply.response,
       },
     ]);
 
@@ -250,13 +323,22 @@ export default function ChatWindow() {
       }
 
       appendMessages(responseMessages);
+    } catch {
+      removeTypingMessage();
+      appendMessages([
+        {
+          id: `error-${Date.now()}`,
+          role: "assistant",
+          text: "I could not finish the privacy check. No data was shared. Please try again.",
+        },
+      ]);
     } finally {
       setIsChecking(false);
     }
   }
 
   async function handleConfirmationChoice(choice) {
-    if (!pendingConfirmation) return;
+    if (!pendingConfirmation || isConfirming) return;
 
     const apiChoice =
       choice === "approve" ? "yes" : choice === "safer" ? "alternative" : "no";
@@ -267,36 +349,42 @@ export default function ChatWindow() {
           ? "See safer alternative"
           : "No, cancel";
 
-    const result = await sendConfirmationChoice({
-      ...pendingConfirmation,
-      choice: apiChoice,
-    });
+    setIsConfirming(true);
 
-    setPendingConfirmation(null);
-    appendMessages([
-      {
-        id: `choice-${Date.now()}`,
-        role: "user",
-        text: label,
-      },
-      {
-        id: `choice-response-${Date.now()}`,
-        role: "assistant",
-        text: result.assistant_message,
-      },
-      ...(result.receipt
-        ? [
-            {
-              id: `choice-receipt-${Date.now()}`,
-              role: "assistant",
-              type: "receipt",
-              receipt: result.receipt,
-            },
-          ]
-        : []),
-    ]);
+    try {
+      const result = await sendConfirmationChoice({
+        ...pendingConfirmation,
+        choice: apiChoice,
+      });
 
-    window.requestAnimationFrame(() => inputRef.current?.focus());
+      setPendingConfirmation(null);
+      appendMessages([
+        {
+          id: `choice-${Date.now()}`,
+          role: "user",
+          text: label,
+        },
+        {
+          id: `choice-response-${Date.now()}`,
+          role: "assistant",
+          text: result.assistant_message,
+        },
+        ...(result.receipt
+          ? [
+              {
+                id: `choice-receipt-${Date.now()}`,
+                role: "assistant",
+                type: "receipt",
+                receipt: result.receipt,
+              },
+            ]
+          : []),
+      ]);
+
+      window.requestAnimationFrame(() => inputRef.current?.focus());
+    } finally {
+      setIsConfirming(false);
+    }
   }
 
   const placeholder = pendingConfirmation
@@ -325,12 +413,14 @@ export default function ChatWindow() {
               key={message.id}
               isConfirmationActive={
                 message.type === "confirmation" &&
-                pendingConfirmation?.confirmation === message.confirmation
+                pendingConfirmation?.confirmation === message.confirmation &&
+                !isConfirming
               }
               message={message}
               selectedPersona={selectedPersona}
               onSelectPersona={handleSelectPersona}
               onConfirmationChoice={handleConfirmationChoice}
+              onQuickReply={handleQuickReply}
             />
           ))}
           <div ref={bottomRef} />
@@ -342,7 +432,7 @@ export default function ChatWindow() {
             value={inputValue}
             onChange={(event) => setInputValue(event.target.value)}
             placeholder={placeholder}
-            disabled={!selectedPersona || Boolean(pendingConfirmation) || isChecking}
+            disabled={!selectedPersona || Boolean(pendingConfirmation) || isChecking || isConfirming}
             aria-label="Task message"
           />
           <button disabled={!canSend} type="submit" aria-label="Send task">

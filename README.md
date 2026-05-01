@@ -6,7 +6,7 @@ PersonaGuard sits between a user and an autonomous AI agent. It checks what data
 
 ## Team Structure
 
-### Person 1 — Backend + Governor Engine
+### Shravani — Backend + Governor Engine
 Owns the privacy decision-making brain.
 
 Main folders:
@@ -23,7 +23,7 @@ Responsibilities:
 - Audit logger
 - Privacy receipt generator
 
-### Person 2 — LLM Integration + Conversation Logic
+### Kanak — LLM Integration + Conversation Logic
 Owns the AI conversation layer.
 
 Main folders:
@@ -38,7 +38,7 @@ Responsibilities:
 - Turning governor decisions into natural chat responses
 - Confirmation flow handling
 
-### Person 3 — Frontend + User Experience
+### Khushi — Frontend + User Experience
 Owns the user interface.
 
 Main folders:

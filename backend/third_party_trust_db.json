@@ -1,0 +1,72 @@
+{
+  "stripe": {
+    "trusted_by": ["conservative", "balanced", "convenience_first"],
+    "category": "payment",
+    "description": "Payment processing platform"
+  },
+  "paypal": {
+    "trusted_by": ["conservative", "balanced", "convenience_first"],
+    "category": "payment",
+    "description": "Online payment system"
+  },
+  "google": {
+    "trusted_by": ["conservative", "balanced", "convenience_first"],
+    "category": "general",
+    "description": "Google services"
+  },
+  "apple": {
+    "trusted_by": ["conservative", "balanced", "convenience_first"],
+    "category": "general",
+    "description": "Apple services"
+  },
+  "amazon": {
+    "trusted_by": ["balanced", "convenience_first"],
+    "category": "shopping",
+    "description": "Amazon shopping and services"
+  },
+  "uber": {
+    "trusted_by": ["balanced", "convenience_first"],
+    "category": "transport",
+    "description": "Ride hailing service"
+  },
+  "openai": {
+    "trusted_by": ["balanced", "convenience_first"],
+    "category": "ai",
+    "description": "AI services provider"
+  },
+  "booking.com": {
+    "trusted_by": ["convenience_first"],
+    "category": "travel",
+    "description": "Hotel and travel booking"
+  },
+  "expedia": {
+    "trusted_by": ["convenience_first"],
+    "category": "travel",
+    "description": "Travel booking platform"
+  },
+  "skyscanner": {
+    "trusted_by": ["convenience_first"],
+    "category": "travel",
+    "description": "Flight search engine"
+  },
+  "ryanair": {
+    "trusted_by": ["convenience_first"],
+    "category": "travel",
+    "description": "Budget airline"
+  },
+  "british_airways": {
+    "trusted_by": ["convenience_first"],
+    "category": "travel",
+    "description": "Full service airline"
+  },
+  "facebook": {
+    "trusted_by": [],
+    "category": "social",
+    "description": "Social media platform — blocked for all personas"
+  },
+  "tiktok": {
+    "trusted_by": [],
+    "category": "social",
+    "description": "Short video platform — blocked for all personas"
+  }
+}

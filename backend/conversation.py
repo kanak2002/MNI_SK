@@ -21,13 +21,13 @@ from dotenv import load_dotenv
 load_dotenv()  # must be before any os.getenv()
 
 # ------------------------------------------------------------------
-# Dev A's real modules
+# Dev A's real modules - edited this last on May 01 - 1:25 AM
 # ------------------------------------------------------------------
-from governor import evaluate_task
-from persona_engine import get_persona
-from receipt_generator import generate_receipt
-from audit_logger import log_decision
-from privacy_evaluator import PrivacyEvaluator, append_privacy_audit_to_log
+from backend.governor import evaluate_task
+from backend.persona_engine import get_persona
+from backend.receipt_generator import generate_receipt
+from backend.audit_logger import log_decision
+from backend.privacy_evaluator import PrivacyEvaluator, append_privacy_audit_to_log
 
 # ------------------------------------------------------------------
 # OpenRouter client — Claude via OpenRouter

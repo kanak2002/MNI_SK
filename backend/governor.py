@@ -1,6 +1,6 @@
-from persona_engine import get_persona
-from privacy_classifier import classify_subtask
-from privacy_evaluator import PrivacyEvaluator, append_privacy_audit_to_log
+from backend.persona_engine import get_persona
+from backend.privacy_classifier import classify_subtask
+from backend.privacy_evaluator import PrivacyEvaluator, append_privacy_audit_to_log
 
 _privacy_eval = PrivacyEvaluator(strict=True)
 

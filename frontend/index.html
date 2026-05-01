@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PersonaGuard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a26;
+    --border: #2a2a3d;
+    --border-bright: #3d3d5c;
+    --text: #e8e8f0;
+    --text-dim: #8888aa;
+    --text-muted: #4a4a6a;
+    --accent: #6c63ff;
+    --accent-glow: rgba(108,99,255,0.18);
+    --accent-dim: #3d3880;
+    --green: #2dd4a0;
+    --green-bg: rgba(45,212,160,0.08);
+    --amber: #f5a623;
+    --amber-bg: rgba(245,166,35,0.08);
+    --red: #ff5f7e;
+    --red-bg: rgba(255,95,126,0.08);
+    --blue: #4fa3ff;
+    --blue-bg: rgba(79,163,255,0.08);
+    --mono: 'DM Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    overflow: hidden;
+  }
+
+  /* ── ONBOARDING ── */
+  #onboarding {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg);
+    z-index: 100;
+    padding: 24px;
+  }
+
+  .ob-card {
+    width: 100%; max-width: 540px;
+    animation: fadeUp 0.6s ease both;
+  }
+
+  .ob-logo {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 36px;
+  }
+
+  .ob-logo-icon {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  .ob-logo-text {
+    font-size: 22px; font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  .ob-headline {
+    font-size: 38px; font-weight: 800;
+    line-height: 1.1; letter-spacing: -1.5px;
+    margin-bottom: 12px;
+  }
+
+  .ob-headline span { color: var(--accent); }
+
+  .ob-sub {
+    font-family: var(--mono);
+    font-size: 13px; color: var(--text-dim);
+    margin-bottom: 40px; line-height: 1.6;
+  }
+
+  .ob-label {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--text-muted); letter-spacing: 2px;
+    text-transform: uppercase; margin-bottom: 14px;
+  }
+
+  .persona-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px; margin-bottom: 28px;
+  }
+
+  .persona-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--surface);
+    position: relative; overflow: hidden;
+  }
+
+  .persona-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    opacity: 0; transition: opacity 0.2s;
+  }
+
+  .persona-card.p-conservative::before { background: var(--green-bg); }
+  .persona-card.p-balanced::before { background: var(--blue-bg); }
+  .persona-card.p-convenience::before { background: var(--amber-bg); }
+
+  .persona-card:hover { border-color: var(--border-bright); transform: translateY(-1px); }
+  .persona-card:hover::before { opacity: 1; }
+
+  .persona-card.selected { transform: translateY(-2px); }
+  .persona-card.p-conservative.selected { border-color: var(--green); box-shadow: 0 0 0 1px var(--green), 0 8px 32px rgba(45,212,160,0.15); }
+  .persona-card.p-balanced.selected { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue), 0 8px 32px rgba(79,163,255,0.15); }
+  .persona-card.p-convenience.selected { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber), 0 8px 32px rgba(245,166,35,0.15); }
+
+  .persona-card.selected::before { opacity: 1; }
+
+  .pc-emoji { font-size: 24px; margin-bottom: 10px; display: block; }
+  .pc-name { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .pc-desc { font-family: var(--mono); font-size: 10px; color: var(--text-dim); line-height: 1.5; }
+
+  .pc-check {
+    position: absolute; top: 10px; right: 10px;
+    width: 18px; height: 18px; border-radius: 50%;
+    display: none; align-items: center; justify-content: center;
+    font-size: 10px;
+  }
+
+  .p-conservative .pc-check { background: var(--green); }
+  .p-balanced .pc-check { background: var(--blue); }
+  .p-convenience .pc-check { background: var(--amber); }
+  .selected .pc-check { display: flex; }
+
+  .ob-btn {
+    width: 100%; padding: 15px;
+    background: var(--accent);
+    border: none; border-radius: 12px;
+    color: #fff; font-family: var(--sans);
+    font-size: 15px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s;
+    letter-spacing: -0.3px;
+  }
+
+  .ob-btn:hover { background: #7b74ff; transform: translateY(-1px); box-shadow: 0 8px 32px rgba(108,99,255,0.3); }
+  .ob-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  /* ── APP SHELL ── */
+  #app {
+    display: none;
+    height: 100vh;
+    flex-direction: column;
+  }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    display: flex; align-items: center;
+    padding: 0 20px;
+    height: 56px; min-height: 56px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  .topbar-logo {
+    display: flex; align-items: center; gap: 8px;
+    font-weight: 700; font-size: 16px; letter-spacing: -0.5px;
+  }
+
+  .topbar-logo-icon {
+    width: 28px; height: 28px; background: var(--accent);
+    border-radius: 7px; display: flex; align-items: center;
+    justify-content: center; font-size: 14px;
+  }
+
+  .topbar-persona {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .persona-badge {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 20px;
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    border: 1px solid;
+  }
+
+  .persona-badge.p-conservative { color: var(--green); border-color: rgba(45,212,160,0.3); background: var(--green-bg); }
+  .persona-badge.p-balanced { color: var(--blue); border-color: rgba(79,163,255,0.3); background: var(--blue-bg); }
+  .persona-badge.p-convenience { color: var(--amber); border-color: rgba(245,166,35,0.3); background: var(--amber-bg); }
+
+  .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  .switch-btn {
+    padding: 5px 12px; border-radius: 8px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text-dim); font-family: var(--mono); font-size: 11px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .switch-btn:hover { color: var(--text); border-color: var(--border-bright); }
+
+  /* ── MAIN LAYOUT ── */
+  .main {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* ── CHAT AREA ── */
+  .chat-area {
+    flex: 1; display: flex; flex-direction: column; min-width: 0;
+  }
+
+  .messages {
+    flex: 1; overflow-y: auto; padding: 24px 20px;
+    display: flex; flex-direction: column; gap: 16px;
+    scroll-behavior: smooth;
+  }
+
+  .messages::-webkit-scrollbar { width: 4px; }
+  .messages::-webkit-scrollbar-track { background: transparent; }
+  .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* ── MESSAGES ── */
+  .msg {
+    display: flex; gap: 10px;
+    animation: fadeUp 0.25s ease both;
+    max-width: 720px;
+  }
+
+  .msg.user { flex-direction: row-reverse; margin-left: auto; }
+
+  .msg-avatar {
+    width: 30px; height: 30px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0;
+    background: var(--surface2); border: 1px solid var(--border);
+  }
+
+  .msg.user .msg-avatar { background: var(--accent-dim); border-color: var(--accent); }
+
+  .msg-body { flex: 1; min-width: 0; }
+
+  .msg-bubble {
+    padding: 12px 16px; border-radius: 12px;
+    font-size: 14px; line-height: 1.7;
+    font-family: var(--mono);
+    white-space: pre-wrap; word-break: break-word;
+  }
+
+  .msg.assistant .msg-bubble {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px 12px 12px 12px;
+    color: var(--text);
+  }
+
+  .msg.user .msg-bubble {
+    background: var(--accent);
+    border-radius: 12px 4px 12px 12px;
+    color: #fff;
+    text-align: right;
+  }
+
+  /* ── TYPING INDICATOR ── */
+  .typing-indicator {
+    display: flex; gap: 10px; align-items: flex-start;
+    animation: fadeUp 0.2s ease both;
+  }
+
+  .typing-dots {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 4px 12px 12px 12px;
+    padding: 12px 16px;
+    display: flex; gap: 5px; align-items: center;
+  }
+
+  .typing-dots span {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--text-muted);
+    animation: blink 1.2s ease infinite;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+  /* ── CONFIRMATION CARD ── */
+  .confirm-card {
+    margin-top: 8px;
+    border: 1px solid rgba(108,99,255,0.4);
+    border-radius: 12px; padding: 16px;
+    background: rgba(108,99,255,0.05);
+    animation: fadeUp 0.3s ease both;
+  }
+
+  .confirm-card-title {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--accent); letter-spacing: 2px;
+    text-transform: uppercase; margin-bottom: 8px;
+  }
+
+  .confirm-card-msg {
+    font-family: var(--mono); font-size: 13px;
+    color: var(--text-dim); line-height: 1.6; margin-bottom: 14px;
+  }
+
+  .confirm-buttons { display: flex; gap: 8px; }
+
+  .confirm-yes, .confirm-no {
+    padding: 9px 20px; border-radius: 8px;
+    font-family: var(--sans); font-size: 13px; font-weight: 600;
+    cursor: pointer; border: 1px solid; transition: all 0.15s;
+  }
+
+  .confirm-yes {
+    background: var(--green); border-color: var(--green); color: #0a0a0f;
+  }
+  .confirm-yes:hover { background: #3be0b0; box-shadow: 0 4px 16px rgba(45,212,160,0.3); }
+
+  .confirm-no {
+    background: transparent; border-color: var(--border); color: var(--text-dim);
+  }
+  .confirm-no:hover { border-color: var(--red); color: var(--red); }
+
+  /* ── RECEIPT CARD ── */
+  .receipt-card {
+    margin-top: 8px;
+    border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+    animation: fadeUp 0.3s ease both;
+  }
+
+  .receipt-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer; user-select: none;
+  }
+
+  .receipt-header-label {
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--text-dim); flex: 1;
+  }
+
+  .receipt-toggle {
+    font-size: 11px; color: var(--text-muted); transition: transform 0.2s;
+  }
+  .receipt-toggle.open { transform: rotate(180deg); }
+
+  .receipt-body { display: none; padding: 14px; }
+  .receipt-body.open { display: block; }
+
+  .receipt-section { margin-bottom: 12px; }
+  .receipt-section:last-child { margin-bottom: 0; }
+
+  .rs-label {
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    margin-bottom: 6px; font-weight: 500;
+  }
+
+  .rs-label.shared { color: var(--green); }
+  .rs-label.protected { color: var(--blue); }
+  .rs-label.blocked { color: var(--red); }
+  .rs-label.audit { color: var(--accent); }
+
+  .rs-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 6px 10px; border-radius: 6px;
+    margin-bottom: 4px;
+    font-family: var(--mono); font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .rs-item.shared { background: var(--green-bg); color: var(--text-dim); }
+  .rs-item.protected { background: var(--blue-bg); color: var(--text-dim); }
+  .rs-item.blocked { background: var(--red-bg); color: var(--text-dim); }
+  .rs-item.audit { background: var(--accent-glow); color: var(--text-dim); }
+
+  .rs-dot { width: 5px; height: 5px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .shared .rs-dot { background: var(--green); }
+  .protected .rs-dot { background: var(--blue); }
+  .blocked .rs-dot { background: var(--red); }
+  .audit .rs-dot { background: var(--accent); }
+
+  .rs-empty { font-family: var(--mono); font-size: 12px; color: var(--text-muted); padding: 4px 0; }
+
+  .audit-score {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; border-radius: 20px;
+    font-family: var(--mono); font-size: 11px;
+    font-weight: 500; margin-bottom: 6px;
+  }
+  .audit-score.pass { background: var(--green-bg); color: var(--green); }
+  .audit-score.fail { background: var(--red-bg); color: var(--red); }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 260px; flex-shrink: 0;
+    border-left: 1px solid var(--border);
+    background: var(--surface);
+    display: flex; flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .sidebar::-webkit-scrollbar { width: 3px; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .sidebar-section { padding: 16px; border-bottom: 1px solid var(--border); }
+
+  .sidebar-title {
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: 2px; text-transform: uppercase;
+    color: var(--text-muted); margin-bottom: 12px;
+  }
+
+  .stat-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .stat-label { font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
+  .stat-val { font-family: var(--mono); font-size: 12px; font-weight: 500; }
+  .stat-val.green { color: var(--green); }
+  .stat-val.red { color: var(--red); }
+  .stat-val.amber { color: var(--amber); }
+  .stat-val.blue { color: var(--blue); }
+
+  .audit-log-entry {
+    padding: 8px 10px; border-radius: 8px;
+    background: var(--surface2); border: 1px solid var(--border);
+    margin-bottom: 6px;
+    font-family: var(--mono); font-size: 11px;
+    line-height: 1.5;
+  }
+
+  .ale-task { color: var(--text-dim); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ale-status { display: flex; align-items: center; gap: 4px; }
+  .ale-badge {
+    padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;
+  }
+  .ale-badge.pass { background: var(--green-bg); color: var(--green); }
+  .ale-badge.fail { background: var(--red-bg); color: var(--red); }
+  .ale-score { color: var(--text-muted); }
+
+  .privacy-score-ring {
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; padding: 8px 0;
+  }
+
+  .ring-svg { transform: rotate(-90deg); }
+  .ring-bg { fill: none; stroke: var(--surface2); stroke-width: 6; }
+  .ring-fill { fill: none; stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 1s ease; }
+  .ring-label { font-size: 22px; font-weight: 800; }
+  .ring-sub { font-family: var(--mono); font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+  /* ── INPUT AREA ── */
+  .input-area {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .input-row {
+    display: flex; gap: 10px; align-items: flex-end;
+  }
+
+  .input-wrap {
+    flex: 1; position: relative;
+  }
+
+  textarea {
+    width: 100%; padding: 12px 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text); font-family: var(--mono); font-size: 13px;
+    resize: none; outline: none;
+    transition: border-color 0.15s;
+    line-height: 1.6; max-height: 140px;
+  }
+
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { color: var(--text-muted); }
+  textarea:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .send-btn {
+    width: 44px; height: 44px; border-radius: 10px;
+    background: var(--accent); border: none;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.15s; flex-shrink: 0;
+    color: #fff;
+  }
+  .send-btn:hover { background: #7b74ff; box-shadow: 0 4px 16px rgba(108,99,255,0.4); }
+  .send-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+
+  .input-hint {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--text-muted); margin-top: 8px; text-align: center;
+  }
+
+  .locked-overlay {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px; border-radius: 12px;
+    background: var(--surface2); border: 1px solid var(--border-bright);
+    font-family: var(--mono); font-size: 12px; color: var(--text-dim);
+  }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 12px; padding: 40px;
+    text-align: center;
+  }
+
+  .empty-icon { font-size: 40px; opacity: 0.4; }
+
+  .empty-title {
+    font-size: 20px; font-weight: 700; letter-spacing: -0.5px;
+    color: var(--text-dim);
+  }
+
+  .empty-sub {
+    font-family: var(--mono); font-size: 12px;
+    color: var(--text-muted); line-height: 1.7; max-width: 320px;
+  }
+
+  .suggestion-chips {
+    display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+    margin-top: 8px;
+  }
+
+  .chip {
+    padding: 7px 14px; border-radius: 20px;
+    background: var(--surface2); border: 1px solid var(--border);
+    font-family: var(--mono); font-size: 12px; color: var(--text-dim);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes blink {
+    0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+    40% { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* ── ERROR TOAST ── */
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--red); color: #fff;
+    padding: 10px 20px; border-radius: 8px;
+    font-family: var(--mono); font-size: 13px;
+    z-index: 1000; opacity: 0;
+    transition: opacity 0.3s; pointer-events: none;
+  }
+  .toast.visible { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- ── ONBOARDING ── -->
+<div id="onboarding">
+  <div class="ob-card">
+    <div class="ob-logo">
+      <div class="ob-logo-icon">🛡</div>
+      <div class="ob-logo-text">PersonaGuard</div>
+    </div>
+    <h1 class="ob-headline">Your privacy,<br/><span>your rules.</span></h1>
+    <p class="ob-sub">Choose how much you share. PersonaGuard enforces your privacy preferences<br/>on every action, automatically.</p>
+    <div class="ob-label">Select your privacy persona</div>
+    <div class="persona-grid">
+      <div class="persona-card p-conservative" data-persona="conservative" onclick="selectPersona(this)">
+        <div class="pc-check">✓</div>
+        <span class="pc-emoji">🔒</span>
+        <div class="pc-name">Conservative</div>
+        <div class="pc-desc">Maximum privacy. Asks before everything.</div>
+      </div>
+      <div class="persona-card p-balanced" data-persona="balanced" onclick="selectPersona(this)">
+        <div class="pc-check">✓</div>
+        <span class="pc-emoji">⚖️</span>
+        <div class="pc-name">Balanced</div>
+        <div class="pc-desc">Share what's needed. Block what's not.</div>
+      </div>
+      <div class="persona-card p-convenience" data-persona="convenience_first" onclick="selectPersona(this)">
+        <div class="pc-check">✓</div>
+        <span class="pc-emoji">⚡</span>
+        <div class="pc-name">Convenience</div>
+        <div class="pc-desc">Get things done fast. Minimal friction.</div>
+      </div>
+    </div>
+    <button class="ob-btn" id="startBtn" disabled onclick="startSession()">Get started</button>
+  </div>
+</div>
+
+<!-- ── APP ── -->
+<div id="app">
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-logo">
+      <div class="topbar-logo-icon">🛡</div>
+      PersonaGuard
+    </div>
+    <div class="topbar-persona">
+      <div class="persona-badge" id="topPersonaBadge">
+        <div class="badge-dot"></div>
+        <span id="topPersonaLabel">—</span>
+      </div>
+      <button class="switch-btn" onclick="switchPersona()">Switch</button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <!-- Chat -->
+    <div class="chat-area">
+      <div class="messages" id="messages">
+        <div class="empty-state" id="emptyState">
+          <div class="empty-icon">🛡</div>
+          <div class="empty-title">What can I help with?</div>
+          <div class="empty-sub">I'll complete your tasks while enforcing your privacy rules — automatically.</div>
+          <div class="suggestion-chips">
+            <div class="chip" onclick="useChip(this)">Book a flight to London</div>
+            <div class="chip" onclick="useChip(this)">Find a hotel in Chicago under $200</div>
+            <div class="chip" onclick="useChip(this)">Schedule a meeting for tomorrow</div>
+            <div class="chip" onclick="useChip(this)">Order lunch nearby</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input -->
+      <div class="input-area">
+        <div class="input-row" id="inputRow">
+          <div class="input-wrap">
+            <textarea id="msgInput" rows="1" placeholder="Ask me anything..." onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+          </div>
+          <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
+        <div class="locked-overlay" id="lockedMsg" style="display:none;">
+          <span>🔒</span>
+          <span>Respond to the confirmation above to continue</span>
+        </div>
+        <div class="input-hint" id="inputHint">Enter to send · Shift+Enter for new line</div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <!-- Privacy Score -->
+      <div class="sidebar-section">
+        <div class="sidebar-title">Session Privacy</div>
+        <div class="privacy-score-ring">
+          <svg class="ring-svg" width="80" height="80" viewBox="0 0 80 80">
+            <circle class="ring-bg" cx="40" cy="40" r="32"/>
+            <circle class="ring-fill" id="ringFill" cx="40" cy="40" r="32"
+              stroke="#6c63ff"
+              stroke-dasharray="201"
+              stroke-dashoffset="201"/>
+          </svg>
+          <div class="ring-label" id="scoreLabel">—</div>
+          <div class="ring-sub">avg. privacy score</div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="sidebar-section">
+        <div class="sidebar-title">Decisions</div>
+        <div class="stat-row">
+          <span class="stat-label">✓ Permitted</span>
+          <span class="stat-val green" id="statPermit">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">⟳ Substituted</span>
+          <span class="stat-val blue" id="statSub">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">? Confirmed</span>
+          <span class="stat-val amber" id="statConfirm">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">✕ Blocked</span>
+          <span class="stat-val red" id="statBlock">0</span>
+        </div>
+      </div>
+
+      <!-- Audit Log -->
+      <div class="sidebar-section" style="flex:1">
+        <div class="sidebar-title">Audit Log</div>
+        <div id="auditLog">
+          <div class="rs-empty">No tasks yet</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const API = 'http://localhost:8000';
+
+  // ── State ──
+  let state = {
+    conversationId: null,
+    persona: null,
+    appState: 'IDLE', // IDLE | LOADING | AWAITING_CONFIRM | CONFIRMED
+    stats: { permit: 0, sub: 0, confirm: 0, block: 0 },
+    scores: [],
+    auditEntries: []
+  };
+
+  // ── Onboarding ──
+  function selectPersona(el) {
+    document.querySelectorAll('.persona-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    state.persona = el.dataset.persona;
+    document.getElementById('startBtn').disabled = false;
+  }
+
+  async function startSession() {
+    const btn = document.getElementById('startBtn');
+    btn.disabled = true;
+    btn.textContent = 'Starting…';
+
+    state.conversationId = crypto.randomUUID();
+
+    try {
+      const res = await fetch(`${API}/api/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation_id: state.conversationId,
+          persona: state.persona
+        })
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+
+      // Show app
+      document.getElementById('onboarding').style.display = 'none';
+      const app = document.getElementById('app');
+      app.style.display = 'flex';
+
+      // Set persona badge
+      setPersonaBadge(state.persona);
+
+      // Welcome message
+      addMessage('assistant', data.message);
+
+    } catch (e) {
+      showToast('Failed to start: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = 'Get started';
+    }
+  }
+
+  function setPersonaBadge(persona) {
+    const badge = document.getElementById('topPersonaBadge');
+    badge.className = 'persona-badge';
+    const labels = {
+      conservative: '🔒 Conservative',
+      balanced: '⚖️ Balanced',
+      convenience_first: '⚡ Convenience'
+    };
+    const cls = { conservative: 'p-conservative', balanced: 'p-balanced', convenience_first: 'p-convenience' };
+    badge.classList.add(cls[persona] || 'p-balanced');
+    document.getElementById('topPersonaLabel').textContent = labels[persona] || persona;
+  }
+
+  function switchPersona() {
+    document.getElementById('onboarding').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('messages').innerHTML = `
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">🛡</div>
+        <div class="empty-title">What can I help with?</div>
+        <div class="empty-sub">I'll complete your tasks while enforcing your privacy rules — automatically.</div>
+        <div class="suggestion-chips">
+          <div class="chip" onclick="useChip(this)">Book a flight to London</div>
+          <div class="chip" onclick="useChip(this)">Find a hotel in Chicago under $200</div>
+          <div class="chip" onclick="useChip(this)">Schedule a meeting for tomorrow</div>
+          <div class="chip" onclick="useChip(this)">Order lunch nearby</div>
+        </div>
+      </div>`;
+    state = { conversationId: null, persona: null, appState: 'IDLE', stats: { permit: 0, sub: 0, confirm: 0, block: 0 }, scores: [], auditEntries: [] };
+    updateStats();
+    document.getElementById('auditLog').innerHTML = '<div class="rs-empty">No tasks yet</div>';
+    document.getElementById('scoreLabel').textContent = '—';
+    document.getElementById('ringFill').style.strokeDashoffset = '201';
+    document.querySelectorAll('.persona-card').forEach(c => c.classList.remove('selected'));
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('startBtn').textContent = 'Get started';
+  }
+
+  // ── Messaging ──
+  async function sendMessage() {
+    const input = document.getElementById('msgInput');
+    const msg = input.value.trim();
+    if (!msg || state.appState !== 'IDLE') return;
+
+    input.value = '';
+    autoResize(input);
+    hideEmptyState();
+    addMessage('user', msg);
+    setAppState('LOADING');
+
+    try {
+      const res = await fetch(`${API}/api/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_id: state.conversationId, message: msg })
+      });
+
+      removeTyping();
+      if (!res.ok) throw new Error((await res.json()).detail || 'Error');
+      const data = await res.json();
+      handleResponse(data);
+
+    } catch (e) {
+      removeTyping();
+      addMessage('assistant', '⚠ Something went wrong: ' + e.message);
+      setAppState('IDLE');
+    }
+  }
+
+  function handleResponse(data) {
+    if (data.type === 'confirmation') {
+      addMessage('assistant', data.message);
+      addConfirmCard(data.confirmation_message, data.decisions || []);
+      setAppState('AWAITING_CONFIRM');
+
+    } else if (data.type === 'response') {
+      addMessage('assistant', data.message);
+      if (data.receipt) addReceiptCard(data.receipt, data.governor_summary);
+      if (data.receipt) updateStats(data.receipt, data.governor_summary);
+      setAppState('IDLE');
+
+    } else {
+      addMessage('assistant', data.message || JSON.stringify(data));
+      setAppState('IDLE');
+    }
+  }
+
+  async function sendConfirm(confirmed) {
+    // Disable buttons immediately
+    document.querySelectorAll('.confirm-yes, .confirm-no').forEach(b => b.disabled = true);
+    setAppState('LOADING');
+
+    try {
+      const res = await fetch(`${API}/api/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_id: state.conversationId, confirmed })
+      });
+
+      removeTyping();
+      if (!res.ok) throw new Error((await res.json()).detail || 'Error');
+      const data = await res.json();
+      handleResponse(data);
+
+    } catch (e) {
+      removeTyping();
+      addMessage('assistant', '⚠ Something went wrong: ' + e.message);
+      setAppState('IDLE');
+    }
+  }
+
+  // ── State management ──
+  function setAppState(s) {
+    state.appState = s;
+    const input = document.getElementById('msgInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const inputRow = document.getElementById('inputRow');
+    const lockedMsg = document.getElementById('lockedMsg');
+    const hint = document.getElementById('inputHint');
+
+    if (s === 'LOADING') {
+      input.disabled = true;
+      sendBtn.disabled = true;
+      addTypingIndicator();
+      inputRow.style.display = 'flex';
+      lockedMsg.style.display = 'none';
+
+    } else if (s === 'AWAITING_CONFIRM') {
+      input.disabled = true;
+      sendBtn.disabled = true;
+      inputRow.style.display = 'none';
+      lockedMsg.style.display = 'flex';
+      hint.style.display = 'none';
+
+    } else { // IDLE
+      input.disabled = false;
+      sendBtn.disabled = false;
+      inputRow.style.display = 'flex';
+      lockedMsg.style.display = 'none';
+      hint.style.display = 'block';
+      input.focus();
+    }
+  }
+
+  // ── DOM helpers ──
+  function hideEmptyState() {
+    const es = document.getElementById('emptyState');
+    if (es) es.remove();
+  }
+
+  function addMessage(role, text) {
+    const msgs = document.getElementById('messages');
+    const avatars = { assistant: '🛡', user: '👤' };
+    const div = document.createElement('div');
+    div.className = `msg ${role}`;
+    div.innerHTML = `
+      <div class="msg-avatar">${avatars[role]}</div>
+      <div class="msg-body">
+        <div class="msg-bubble">${escHtml(text)}</div>
+      </div>`;
+    msgs.appendChild(div);
+    scrollBottom();
+    return div;
+  }
+
+  function addTypingIndicator() {
+    const msgs = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = 'typing-indicator'; div.id = 'typing';
+    div.innerHTML = `
+      <div class="msg-avatar">🛡</div>
+      <div class="typing-dots"><span></span><span></span><span></span></div>`;
+    msgs.appendChild(div);
+    scrollBottom();
+  }
+
+  function removeTyping() {
+    document.getElementById('typing')?.remove();
+  }
+
+  function addConfirmCard(confirmMsg, decisions) {
+    const msgs = document.getElementById('messages');
+    const last = msgs.querySelector('.msg.assistant:last-of-type .msg-body');
+    if (!last) return;
+
+    const div = document.createElement('div');
+    div.className = 'confirm-card';
+    div.innerHTML = `
+      <div class="confirm-card-title">⚠ Confirmation Required</div>
+      <div class="confirm-card-msg">${escHtml(confirmMsg || 'This action requires your approval.')}</div>
+      <div class="confirm-buttons">
+        <button class="confirm-yes" onclick="sendConfirm(true)">✓ Yes, proceed</button>
+        <button class="confirm-no" onclick="sendConfirm(false)">✕ No, cancel</button>
+      </div>`;
+    last.appendChild(div);
+    scrollBottom();
+  }
+
+  function addReceiptCard(receipt, govSummary) {
+    const msgs = document.getElementById('messages');
+    const last = msgs.querySelector('.msg.assistant:last-of-type .msg-body');
+    if (!last) return;
+
+    const summary = receipt.summary || receipt;
+    const shared = summary.shared || [];
+    const protected_ = summary.protected || [];
+    const blocked = summary.blocked || [];
+    const subs = summary.substitutions || [];
+
+    let sharedHtml = shared.length
+      ? shared.map(s => `<div class="rs-item shared"><div class="rs-dot"></div><span>${escHtml(s.action || '')} → ${escHtml(s.third_party || s.with || '')} (${(s.data || []).join(', ')})</span></div>`).join('')
+      : '<div class="rs-empty">None</div>';
+
+    let protectedHtml = '';
+    if (protected_.length) {
+      protectedHtml = protected_.map(p => `<div class="rs-item protected"><div class="rs-dot"></div><span>${escHtml(typeof p === 'string' ? p : JSON.stringify(p))}</span></div>`).join('');
+    }
+    if (subs.length) {
+      protectedHtml += subs.map(s => `<div class="rs-item protected"><div class="rs-dot"></div><span>${escHtml(s.action || '')} — used safer data</span></div>`).join('');
+    }
+    if (!protectedHtml) protectedHtml = '<div class="rs-empty">None</div>';
+
+    let blockedHtml = blocked.length
+      ? blocked.map(b => `<div class="rs-item blocked"><div class="rs-dot"></div><span>${escHtml(b.action || b.service || '')} — ${escHtml(b.reason || '')}</span></div>`).join('')
+      : '<div class="rs-empty">None</div>';
+
+    const id = 'r' + Date.now();
+    const div = document.createElement('div');
+    div.className = 'receipt-card';
+    div.innerHTML = `
+      <div class="receipt-header" onclick="toggleReceipt('${id}')">
+        <span class="receipt-header-label">📋 Privacy Receipt</span>
+        <span class="receipt-toggle" id="rt${id}">▼</span>
+      </div>
+      <div class="receipt-body" id="${id}">
+        <div class="receipt-section">
+          <div class="rs-label shared">✓ Shared</div>
+          ${sharedHtml}
+        </div>
+        <div class="receipt-section">
+          <div class="rs-label protected">⟳ Protected / Substituted</div>
+          ${protectedHtml}
+        </div>
+        <div class="receipt-section">
+          <div class="rs-label blocked">✕ Blocked</div>
+          ${blockedHtml}
+        </div>
+      </div>`;
+
+    last.appendChild(div);
+    scrollBottom();
+
+    // Add to sidebar audit
+    addAuditEntry(receipt, govSummary);
+  }
+
+  function toggleReceipt(id) {
+    const body = document.getElementById(id);
+    const toggle = document.getElementById('rt' + id);
+    body.classList.toggle('open');
+    toggle.classList.toggle('open');
+  }
+
+  function addAuditEntry(receipt, govSummary) {
+    const task = receipt.task || 'Task';
+    const blocked = govSummary?.blocked || 0;
+    const subst = govSummary?.substituted || 0;
+    state.auditEntries.unshift({ task, blocked, subst });
+
+    const log = document.getElementById('auditLog');
+    if (log.querySelector('.rs-empty')) log.innerHTML = '';
+
+    const div = document.createElement('div');
+    div.className = 'audit-log-entry';
+    div.innerHTML = `
+      <div class="ale-task">${escHtml(task.substring(0, 50))}${task.length > 50 ? '…' : ''}</div>
+      <div class="ale-status">
+        <span class="ale-badge pass">✓</span>
+        <span class="ale-score">${blocked} blocked · ${subst} subst.</span>
+      </div>`;
+    log.prepend(div);
+  }
+
+  function updateStats(receipt, govSummary) {
+    if (!receipt) return;
+    const summary = receipt.summary || receipt;
+    state.stats.permit += (summary.shared || []).length;
+    state.stats.sub += (summary.substitutions || []).length;
+    state.stats.block += (summary.blocked || []).length;
+    if (govSummary?.blocked > 0) state.stats.block++;
+
+    document.getElementById('statPermit').textContent = state.stats.permit;
+    document.getElementById('statSub').textContent = state.stats.sub;
+    document.getElementById('statBlock').textContent = state.stats.block;
+
+    // Simulated score based on block/sub ratio
+    const total = state.stats.permit + state.stats.sub + state.stats.block + 1;
+    const score = Math.round(((state.stats.permit + state.stats.sub * 0.8) / total) * 100);
+    state.scores.push(score);
+    const avg = Math.round(state.scores.reduce((a, b) => a + b, 0) / state.scores.length);
+    document.getElementById('scoreLabel').textContent = avg + '%';
+
+    const circumference = 201;
+    const offset = circumference - (avg / 100) * circumference;
+    const fill = document.getElementById('ringFill');
+    fill.style.strokeDashoffset = offset;
+    fill.style.stroke = avg >= 75 ? 'var(--green)' : avg >= 50 ? 'var(--amber)' : 'var(--red)';
+  }
+
+  // ── Utilities ──
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+  }
+
+  function scrollBottom() {
+    const msgs = document.getElementById('messages');
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function useChip(el) {
+    const input = document.getElementById('msgInput');
+    input.value = el.textContent;
+    autoResize(input);
+    sendMessage();
+  }
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/\n/g, '<br/>');
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('visible');
+    setTimeout(() => t.classList.remove('visible'), 3500);
+  }
+</script>
+</body>
+</html>

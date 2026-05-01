@@ -1,1 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+
+# Env files
+.env
+
+# Logs
+logs/
+
+# Mac
 .DS_Store

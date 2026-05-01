@@ -1,6 +1,6 @@
 import json
 import os
-from persona_engine import get_persona
+from backend.persona_engine import get_persona # edited this for the folder path
 
 # ---------------------------------------------------------
 # Load Third-Party Trust Database

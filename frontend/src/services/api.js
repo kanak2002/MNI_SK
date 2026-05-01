@@ -38,6 +38,9 @@ const MOCK_RESPONSE_DELAY_MS = 450;
 const USE_BACKEND = true;
 const ENABLE_FALLBACK = true;
 const API_BASE_URL = "http://localhost:8000";
+let activeConversationId = null;
+let activeConversationPersona = null;
+let activeConversationStarted = false;
 
 const sensitiveSignals = [
   "address",
@@ -123,7 +126,54 @@ function getSelectedPersona(persona) {
 
 function getBackendPersonaId(persona) {
   if (persona?.id === "convenience") return "convenience_first";
+  if (persona === "convenience") return "convenience_first";
+  if (typeof persona === "string") return persona;
   return persona?.id || "balanced";
+}
+
+function createConversationId() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (character) => {
+    const random = Math.floor(Math.random() * 16);
+    const value = character === "x" ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
+
+function getConversationId(conversationId) {
+  activeConversationId = conversationId || activeConversationId || createConversationId();
+  return activeConversationId;
+}
+
+function prepareConversation(persona, conversationId) {
+  const backendPersona = getBackendPersonaId(persona);
+  const personaChanged = activeConversationPersona !== backendPersona;
+  const conversationChanged =
+    Boolean(conversationId) && conversationId !== activeConversationId;
+
+  if (conversationChanged || personaChanged) {
+    activeConversationStarted = false;
+  }
+
+  activeConversationPersona = backendPersona;
+  return getConversationId(conversationId);
+}
+
+async function postJson(path, body) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(`${path} request failed with ${response.status}`);
+  }
+
+  return response.json();
 }
 
 function inferTaskContext(message) {
@@ -327,6 +377,21 @@ function normalizeDecision(decision = {}) {
   };
 }
 
+function normalizeKanakSubtask(subtask = {}, index = 0) {
+  return normalizeDecision({
+    action: subtask.action || `Review requested subtask ${index + 1}`,
+    third_party: subtask.third_party || null,
+    decision: subtask.decision || "confirm",
+    reason:
+      subtask.reason ||
+      "The chat backend requires confirmation before this subtask continues.",
+    data_required: subtask.data_required,
+    protected_data: subtask.protected_data,
+    confirmation_required: true,
+    substitute_with: subtask.substitute_with,
+  });
+}
+
 function flattenSharedItems(shared = []) {
   return shared.flatMap((item) => {
     const party = item.party || item.third_party || "Approved third party";
@@ -393,6 +458,44 @@ function normalizeReceipt(rawReceipt, rawResponse = {}, originalTask = "") {
     deleted_after_task: true,
     plain_language_summary: rawReceipt.plain_language_summary,
   };
+}
+
+function normalizeKanakReceipt(rawReceipt, originalTask = "") {
+  return normalizeReceipt(rawReceipt, {}, originalTask);
+}
+
+function normalizeKanakResponse(rawResponse = {}, originalTask = "") {
+  if (rawResponse.type === "response") {
+    return {
+      assistant_message: rawResponse.message || "",
+      decisions: normalizeArray(rawResponse.governor_summary?.decisions).map(normalizeDecision),
+      confirmation: null,
+      receipt: normalizeKanakReceipt(rawResponse.receipt, originalTask),
+    };
+  }
+
+  if (rawResponse.type === "confirmation") {
+    const subtasks = normalizeArray(rawResponse.subtasks);
+    const firstSubtask = subtasks[0] || {};
+
+    return {
+      assistant_message: rawResponse.message || "",
+      decisions: subtasks.map(normalizeKanakSubtask),
+      confirmation: {
+        required: true,
+        title: "Confirmation Needed",
+        message: rawResponse.confirmation_message || rawResponse.message || "",
+        action: firstSubtask.action,
+        third_party: firstSubtask.third_party,
+        trusted: true,
+        data_required: normalizeArray(firstSubtask.data_required),
+        protected_data: [],
+      },
+      receipt: null,
+    };
+  }
+
+  throw new Error("Kanak chat response was incomplete.");
 }
 
 function createConfirmation(rawResponse = {}, decisions = []) {
@@ -589,6 +692,47 @@ async function evaluateWithGovernor(payload) {
   );
 }
 
+async function sendKanakStartRequest(persona, conversationId) {
+  return postJson("/api/start", {
+    conversation_id: conversationId,
+    persona: getBackendPersonaId(persona),
+  });
+}
+
+async function ensureKanakConversationStarted(persona, conversationId) {
+  const resolvedConversationId = prepareConversation(persona, conversationId);
+
+  if (!activeConversationStarted) {
+    await sendKanakStartRequest(persona, resolvedConversationId);
+    activeConversationStarted = true;
+  }
+
+  return resolvedConversationId;
+}
+
+async function sendKanakMessageRequest(payload) {
+  const conversationId = await ensureKanakConversationStarted(
+    payload.persona,
+    payload.conversation_id
+  );
+
+  const rawResponse = await postJson("/api/message", {
+    conversation_id: conversationId,
+    message: payload.message || "",
+  });
+
+  return normalizeKanakResponse(rawResponse, payload.message || "");
+}
+
+async function sendKanakConfirmationRequest(payload) {
+  const rawResponse = await postJson("/api/confirm", {
+    conversation_id: getConversationId(payload.conversation_id),
+    confirmed: payload.confirmed ?? payload.choice === "yes",
+  });
+
+  return normalizeKanakResponse(rawResponse, payload.task || "");
+}
+
 function baseDecisions(context, persona) {
   return [
     {
@@ -741,9 +885,51 @@ async function mockSendChatMessage(payload) {
   return responseForMessage(payload.message || "", payload.persona);
 }
 
+export async function startConversation(persona) {
+  const conversationId = prepareConversation(persona);
+
+  if (!USE_BACKEND) {
+    await waitForMockResponse();
+    return {
+      status: "started",
+      persona: getBackendPersonaId(persona),
+      message: "Hi, I am ready to help with your selected privacy settings.",
+      conversation_id: conversationId,
+    };
+  }
+
+  try {
+    const response = await sendKanakStartRequest(persona, conversationId);
+    activeConversationStarted = true;
+
+    return {
+      ...response,
+      conversation_id: conversationId,
+    };
+  } catch (error) {
+    if (!ENABLE_FALLBACK) throw error;
+
+    console.warn("Kanak start request failed; using mock start response.", error);
+    return {
+      status: "started",
+      persona: getBackendPersonaId(persona),
+      message: "Hi, I am ready to help with your selected privacy settings.",
+      conversation_id: conversationId,
+    };
+  }
+}
+
 export async function sendChatMessage(payload) {
   if (!USE_BACKEND) {
     return mockSendChatMessage(payload);
+  }
+
+  try {
+    return await sendKanakMessageRequest(payload);
+  } catch (kanakError) {
+    if (!ENABLE_FALLBACK) throw kanakError;
+
+    console.warn("Kanak chat request failed; trying governor backend.", kanakError);
   }
 
   try {
@@ -757,6 +943,27 @@ export async function sendChatMessage(payload) {
 }
 
 export async function sendConfirmationChoice(payload) {
+  if (USE_BACKEND && payload.choice !== "alternative") {
+    try {
+      return await sendKanakConfirmationRequest(payload);
+    } catch (kanakError) {
+      if (!ENABLE_FALLBACK) throw kanakError;
+
+      console.warn("Kanak confirmation request failed; trying governor backend.", kanakError);
+    }
+
+    try {
+      return await evaluateWithGovernor({
+        message: payload.task || "",
+        persona: payload.persona,
+      });
+    } catch (error) {
+      if (!ENABLE_FALLBACK) throw error;
+
+      console.warn("Governor backend request failed; using mock confirmation response.", error);
+    }
+  }
+
   await waitForMockResponse();
 
   if (payload.choice === "yes") {

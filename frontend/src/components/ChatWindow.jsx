@@ -4,7 +4,11 @@ import ConfirmationCard from "./ConfirmationCard.jsx";
 import PersonaBadge from "./PersonaBadge.jsx";
 import PersonaCards from "./PersonaCards.jsx";
 import PrivacyReceipt from "./PrivacyReceipt.jsx";
-import { sendChatMessage, sendConfirmationChoice } from "../services/api.js";
+import {
+  sendChatMessage,
+  sendConfirmationChoice,
+  startConversation,
+} from "../services/api.js";
 
 const initialMessage = {
   id: "welcome",
@@ -210,10 +214,20 @@ export default function ChatWindow() {
     scrollToBottom(messages.length === 1 ? "auto" : "smooth");
   }, [isChecking, messages, pendingConfirmation, selectedPersona]);
 
-  function handleSelectPersona(persona) {
+  async function handleSelectPersona(persona) {
     if (selectedPersona) return;
 
     setSelectedPersona(persona);
+    const localPersonaMessage = `You\u2019re set to ${persona.name}. In plain language: ${persona.rules.join(" ")}`;
+    let personaMessage = localPersonaMessage;
+
+    try {
+      const response = await startConversation(persona.id);
+      personaMessage = response?.message || localPersonaMessage;
+    } catch {
+      personaMessage = localPersonaMessage;
+    }
+
     appendMessages([
       {
         id: `persona-${persona.id}`,
@@ -223,7 +237,7 @@ export default function ChatWindow() {
       {
         id: `rules-${persona.id}`,
         role: "assistant",
-        text: `You\u2019re set to ${persona.name}. In plain language: ${persona.rules.join(" ")}`,
+        text: personaMessage,
       },
       {
         id: `quick-${persona.id}`,

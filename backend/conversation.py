@@ -320,6 +320,11 @@ class ConversationManager:
         self.pending_subtasks: list[dict] | None = None
         self.pending_task_result: dict | None = None
 
+        # added this new thing
+        self.last_task: str | None = None
+        self.last_decision: str | None = None
+        self.last_task_result: dict | None = None
+
     def get_welcome_message(self) -> str:
         messages = {
             "conservative": (
@@ -360,6 +365,22 @@ class ConversationManager:
                 "message": "Please respond to the confirmation above before sending a new request.",
                 "confirmation_message": build_confirmation_summary(self.pending_task_result),
             }
+
+        # Repeat-task awareness after previous confirmation decision
+        if self.last_task and user_message.strip().lower() == self.last_task.strip().lower():
+            if self.last_decision == "declined":
+                return {
+                    "type": "response",
+                    "message": "You previously declined this action. Would you like to try a safer alternative instead?",
+                    "receipt": None,
+                }
+
+            if self.last_decision == "approved":
+                return {
+                    "type": "response",
+                    "message": "This task was already completed earlier. If you'd like to run it again, please modify the request.",
+                    "receipt": None,
+                }
 
         # Step 1: Decompose task into subtasks for Dev A's governor
         subtasks = await decompose_task(user_message)
@@ -419,6 +440,11 @@ class ConversationManager:
                 pending_task, pending_task_result
             )
             self.history.append({"role": "assistant", "content": decline_text})
+            
+            self.last_task = pending_task
+            self.last_decision = "declined"
+            self.last_task_result = pending_task_result
+
             return {
                 "type": "response",
                 "message": decline_text,
@@ -434,7 +460,13 @@ class ConversationManager:
 
         pending_task_result["confirmation_required"] = False
 
-        return await self._complete_task(pending_task, pending_task_result)
+        result = await self._complete_task(pending_task, pending_task_result)
+
+        self.last_task = pending_task
+        self.last_decision = "approved"
+        self.last_task_result = pending_task_result
+
+        return result
 
     # ------------------------------------------------------------------
     # Task completion — called after confirmation or directly
